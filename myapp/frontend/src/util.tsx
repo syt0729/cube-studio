@@ -180,12 +180,12 @@ export function drawWater() {
     if (!username)
         username = getCookie('mk_user_name') || getCookie('bk_uid') || getCookie('myapp_username');
     if (!username)
-        username = 'kubeflow';
+    username ='Niii';
     var id = getCookie('id');
     if (!id)
         id = '';
     const content = username;
-    const src = id + " @Cube Studio";
+    const src = id + " @Niii";
 
     window.onload = function () {
         drawWaterMark({ content: content, src: src });
@@ -197,12 +197,12 @@ export function drawWaterNow() {
     if (!username)
         username = getCookie('mk_user_name') || getCookie('bk_uid') || getCookie('myapp_username');
     if (!username)
-        username = 'kubeflow';
+        username = 'Niii';
     var id = getCookie('id');
     if (!id)
         id = '';
     const content = username;
-    const src = id + " @Cube Studio";
+    const src = id + " @Niii";
 
     drawWaterMark({ content: content, src: src });
 }

@@ -5,7 +5,8 @@ module.exports = function (app) {
     app.use(
         ['/workflow_modelview'],
         createProxyMiddleware({
-            target: 'http://localhost',
+            //target: 'http://localhost',
+            target: 'http://192.168.1.3:80',
             changeOrigin: true,
         })
     );
@@ -13,7 +14,8 @@ module.exports = function (app) {
     app.use(
         ['**/api/**', '/myapp', '/login', '/idex'],
         createProxyMiddleware({
-            target: 'http://localhost',
+            //target: 'http://localhost',
+            target: 'http://192.168.1.3:80',
             changeOrigin: true,
         })
     );

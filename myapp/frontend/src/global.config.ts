@@ -1,7 +1,7 @@
 import { TThemeType } from "./theme"
 
-const appLogo = require('./images/logoCB.svg')
-const loadingLogo = require('./images/logoCB.svg')
+const appLogo = require('./images/AIMTlogo.svg')
+const loadingLogo = require('./images/AIMTlogo.svg')
 
 interface IGlobalConfig {
     appLogo: any,

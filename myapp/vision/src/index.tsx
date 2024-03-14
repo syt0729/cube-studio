@@ -7,7 +7,7 @@ import { store } from './models/store';
 import { Provider } from 'react-redux';
 // import i18n from './locales/i18n'
 import './app.less';
-import 'antd/dist/antd.css';
+import 'antd/dist/antd.min.css';
 
 import './locales/i18n';
 // i18n.changeLanguage('en')
