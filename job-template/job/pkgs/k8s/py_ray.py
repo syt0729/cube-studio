@@ -2,7 +2,7 @@ import ray
 import re
 
 import os
-import sys
+import sys, json
 import time
 
 from job.pkgs.k8s.py_k8s import K8s
@@ -21,6 +21,7 @@ for task_node_selector in task_node_selectors:
     KFJ_TASK_NODE_SELECTOR[task_node_selector.split('=')[0]] = task_node_selector.split('=')[1]
 
 KFJ_PIPELINE_ID = os.getenv('KFJ_PIPELINE_ID', '')
+KFJ_TASK_PROJECT_NAME = os.getenv('KFJ_TASK_PROJECT_NAME', 'public')
 KFJ_RUN_ID = os.getenv('KFJ_RUN_ID', '')
 KFJ_CREATOR = os.getenv('KFJ_CREATOR', '')
 KFJ_RUNNER = os.getenv('KFJ_RUNNER','')
@@ -41,6 +42,23 @@ k8s_volumes, k8s_volume_mounts = k8s_client.get_volume_mounts(KFJ_TASK_VOLUME_MO
 print(k8s_volumes)
 print(k8s_volume_mounts)
 
+GPU_RESOURCE_NAME= os.getenv('GPU_RESOURCE_NAME', '')
+GPU_RESOURCE = os.getenv('KFJ_TASK_RESOURCE_GPU', '0')
+gpu_num,gpu_type,_ = k8s_client.get_gpu(GPU_RESOURCE)
+if gpu_type:
+    KFJ_TASK_NODE_SELECTOR['gpu-type']=gpu_type
+
+RDMA_RESOURCE_NAME= os.getenv('RDMA_RESOURCE_NAME', '')
+RDMA_RESOURCE = os.getenv('KFJ_TASK_RESOURCE_RDMA', '0')
+
+HUBSECRET = os.getenv('HUBSECRET','hubsecret')
+HUBSECRET=[{"name":hubsecret} for hubsecret in HUBSECRET.split(',')]
+
+DEFAULT_POD_RESOURCES = os.getenv('DEFAULT_POD_RESOURCES','')
+DEFAULT_POD_RESOURCES = json.loads(DEFAULT_POD_RESOURCES) if DEFAULT_POD_RESOURCES else {}
+
+
+
 def create_header_service(name):
     service_json = {
         "apiVersion": "v1",
@@ -54,6 +72,9 @@ def create_header_service(name):
                 "pipeline-rtx": os.getenv('KFJ_CREATOR', 'unknown'),
                 "task-id":os.getenv('KFJ_TASK_ID','unknown'),
                 "pipeline-id": os.getenv('KFJ_PIPELINE_ID', 'unknown')
+            },
+            "annotations": {
+                "project": KFJ_TASK_PROJECT_NAME
             }
         },
         "spec": {
@@ -98,6 +119,9 @@ def create_header_deploy(name):
                 "pipeline-rtx": os.getenv('KFJ_CREATOR', 'unknown'),
                 "task-id":os.getenv('KFJ_TASK_ID','unknown'),
                 "pipeline-id": os.getenv('KFJ_PIPELINE_ID', 'unknown')
+            },
+            "annotations": {
+                "project": KFJ_TASK_PROJECT_NAME
             }
         },
         "spec": {
@@ -118,16 +142,15 @@ def create_header_deploy(name):
                         "component": name,
                         "type": "ray",
                         "run-id": os.getenv('KFJ_RUN_ID', 'unknown'),
+                    },
+                    "annotations": {
+                        "project": KFJ_TASK_PROJECT_NAME
                     }
                 },
                 "spec": {
                     "restartPolicy": "Always",
                     "volumes": k8s_volumes,
-                    "imagePullSecrets": [
-                        {
-                            "name": "hubsecret"
-                        }
-                    ],
+                    "imagePullSecrets": HUBSECRET,
                     "affinity": {
                         "nodeAffinity": {
                             "requiredDuringSchedulingIgnoredDuringExecution": {
@@ -228,6 +251,9 @@ def create_worker_deploy(header_name,worker_name):
                 "pipeline-rtx": os.getenv('KFJ_CREATOR', 'unknown'),
                 "task-id":os.getenv('KFJ_TASK_ID','unknown'),
                 "pipeline-id": os.getenv('KFJ_PIPELINE_ID', 'unknown')
+            },
+            "annotations": {
+                "project": KFJ_TASK_PROJECT_NAME
             }
         },
         "spec": {
@@ -248,7 +274,9 @@ def create_worker_deploy(header_name,worker_name):
                         "component": worker_name,
                         "type": "ray",
                         "run-id": os.getenv('KFJ_RUN_ID', 'unknown'),
-
+                    },
+                    "annotations": {
+                        "project": KFJ_TASK_PROJECT_NAME
                     }
                 },
 
@@ -287,13 +315,9 @@ def create_worker_deploy(header_name,worker_name):
                             ]
                         }
                     },
-                    "imagePullSecrets": [
-                        {
-                            "name": "hubsecret"
-                        }
-                    ],
                     "restartPolicy": "Always",
                     "volumes": k8s_volumes,
+                    "imagePullSecrets": HUBSECRET,
                     "containers": [
                         {
                             "name": "ray-worker",
@@ -321,12 +345,18 @@ def create_worker_deploy(header_name,worker_name):
                             ],
                             "resources": {
                                 "requests": {
-                                    "cpu": KFJ_TASK_RESOURCE_CPU,
-                                    "memory": KFJ_TASK_RESOURCE_MEMORY
+                                    **{
+                                        "cpu": KFJ_TASK_RESOURCE_CPU,
+                                        "memory": KFJ_TASK_RESOURCE_MEMORY,
+                                    },
+                                    **DEFAULT_POD_RESOURCES
                                 },
                                 "limits": {
-                                    "cpu": KFJ_TASK_RESOURCE_CPU,
-                                    "memory": KFJ_TASK_RESOURCE_MEMORY
+                                    **{
+                                        "cpu": KFJ_TASK_RESOURCE_CPU,
+                                        "memory": KFJ_TASK_RESOURCE_MEMORY
+                                    },
+                                    **DEFAULT_POD_RESOURCES
                                 }
                             }
                         }

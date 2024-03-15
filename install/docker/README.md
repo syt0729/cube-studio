@@ -23,16 +23,16 @@ mysql> flush privileges;
 docker build -t ccr.ccs.tencentyun.com/cube-studio/kubeflow-dashboard:base-python3.9 -f install/docker/Dockerfile-base .
 
 使用基础镜像构建生产镜像
-docker build -t ccr.ccs.tencentyun.com/cube-studio/kubeflow-dashboard:2023.12.01 -f install/docker/Dockerfile .
+docker build -t ccr.ccs.tencentyun.com/cube-studio/kubeflow-dashboard:2024.03.01 -f install/docker/Dockerfile .
 
 构建frontend镜像
-docker build -t ccr.ccs.tencentyun.com/cube-studio/kubeflow-dashboard:frontend-2023.12.01 -f install/docker/dockerFrontend/Dockerfile .
+docker build -t ccr.ccs.tencentyun.com/cube-studio/kubeflow-dashboard-frontend:2024.03.01 -f install/docker/dockerFrontend/Dockerfile .
 ```
 
 ## 镜像拉取(如果你不参与开发可以直接使用线上镜像)
 ```
-docker pull ccr.ccs.tencentyun.com/cube-studio/kubeflow-dashboard:2023.12.01
-docker pull ccr.ccs.tencentyun.com/cube-studio/kubeflow-dashboard:frontend-2023.12.01
+docker pull ccr.ccs.tencentyun.com/cube-studio/kubeflow-dashboard:2024.03.01
+docker pull ccr.ccs.tencentyun.com/cube-studio/kubeflow-dashboard-frontend:2024.03.01
 ```
 
 ## deploy myapp (docker-compose)
@@ -106,8 +106,8 @@ cd myapp/vision && yarn && yarn build
 ##### 环境准备
 
 - https://nodejs.org/en/download/ 进入nodejs官网，选择下载LTS长期支持版本
-- 然后在官网下载安装好LTS版本之后，输入`npm install -g n`安装node版本管理器（ https://www.npmjs.com/package/n ），最后输入`n 14.15.0`将node版本切换至14.x
-- https://github.com/nodejs/Release 这里可以找到14.x等往期版本
+- 然后在官网下载安装好LTS版本之后，输入`npm install -g n`安装node版本管理器（ https://www.npmjs.com/package/n ），最后输入`n 16.15.0`将node版本切换至16.x
+- https://github.com/nodejs/Release 这里可以找到16.x等往期版本
 
 
 以主要前端项目`myapp/frontend`为例，到这里前端开发环境已经准备好了

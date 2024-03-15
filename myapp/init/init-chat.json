@@ -34,10 +34,8 @@
     "prompt": "{{history}}\nHuman:{{query}}\nAI:",
     "service_type": "openai",
     "service_config": {
-        "llm_url": "https://lonlie.plus7.plus/v1/chat/completions",
-        "llm_tokens": [
-            "sk-kP5Dir9AFXHFb4HY1426E702267c49C89976A866755a17E0"
-        ],
+        "llm_url": "",
+        "llm_tokens": [],
         "llm_data": {
             "model": "gpt-4-0613"
         }
@@ -119,6 +117,29 @@
     "service_type": "AIGC",
     "service_config": {
         "aigc_url": "/aihub/openjourney/api/model/openjourney/version/v20221001/",
+        "stream": "true"
+    },
+    "owner": "admin,*",
+    "expand": {
+      "index": 6,
+      "isPublic": true
+    }
+  },
+  {
+    "name": "chatbi",
+    "icon": "<svg t=\"1709012691993\" class=\"icon\" viewBox=\"0 0 1024 1024\" version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" p-id=\"5140\" width=\"50\" height=\"50\"><path d=\"M896 64a76.8 76.8 0 0 1 76.8 76.8v588.8a76.8 76.8 0 0 1-76.8 76.8H128a76.8 76.8 0 0 1-76.8-76.8V140.8a76.8 76.8 0 0 1 76.8-76.8h768z m-89.2928 208.4608a38.4 38.4 0 0 0-52.5568 0.6912l-1.6896 1.7408L581.76 461.568 480.5632 299.648l-1.3568-2.0224a38.4 38.4 0 0 0-57.856-5.2864l-1.6896 1.7536-204.8 224-1.5872 1.8432a38.4 38.4 0 0 0 2.2016 50.6368l1.8176 1.7664 1.8432 1.5872a38.4 38.4 0 0 0 50.6368-2.2016l1.7664-1.8176L442.24 383.2064l101.2096 161.9456 1.3568 2.0224a38.4 38.4 0 0 0 57.856 5.2864l1.6896-1.7536 204.8-224 1.5872-1.8432a38.4 38.4 0 0 0-4.0192-52.4032z\" fill=\"#6B57FE\" p-id=\"5141\"></path><path d=\"M819.2 883.2a38.4 38.4 0 0 1 2.2528 76.736L819.2 960H204.8a38.4 38.4 0 0 1-2.2528-76.736L204.8 883.2h614.4z\" fill=\"#FFBA00\" p-id=\"5142\"></path></svg>",
+    "label": "chatbi",
+    "doc": "",
+    "session_num": 0,
+    "chat_type": "text",
+    "hello": "通过对话查询数据看板，需要二开配置数据接口",
+    "tips": "",
+    "knowledge": {
+      "file": "xx/xx/xx/xx.json"
+    },
+    "prompt": "{{query}}",
+    "service_type": "openai",
+    "service_config": {
         "stream": "true"
     },
     "owner": "admin,*",
