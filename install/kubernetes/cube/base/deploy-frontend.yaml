@@ -99,7 +99,7 @@ spec:
       containers:
         - name: kubeflow-dashboard-frontend
           image: ccr.ccs.tencentyun.com/cube-studio/kubeflow-dashboard-frontend
-          imagePullPolicy: Always  # IfNotPresent  Always
+          imagePullPolicy: IfNotPresent  # IfNotPresent  Always
 
           ports:
             - name: http

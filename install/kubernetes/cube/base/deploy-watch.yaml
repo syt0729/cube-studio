@@ -50,7 +50,7 @@ spec:
       containers:
         - name: kubeflow-watch-workflow
           image: ccr.ccs.tencentyun.com/cube-studio/kubeflow-dashboard
-          imagePullPolicy: Always  # IfNotPresent
+          imagePullPolicy: IfNotPresent  # IfNotPresent
           workingDir: /home/myapp
           command: ["bash","myapp/tools/start.sh"]
           env:
