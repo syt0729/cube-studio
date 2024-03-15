@@ -212,6 +212,34 @@ export const formatRoute = (data: IAppMenuItem[]): IRouterConfigPlusItem[] => {
     return resData
 }
 
+const whiteList = ['标注平台','任务实例']
+const blackList = ['数据探索', '元数据']
+export const customizeRoute = (data: IAppMenuItem[]):IAppMenuItem[] => {
+    const customized:IAppMenuItem[] = []
+    //隐藏所有不可用菜单项；标注平台采用外链跳转；
+    for (let i = 0; i < data.length; i++) {
+        const item = data[i]
+        if((!blackList.find((e)=>e === item.title) && !item.hidden && !item.disable) || whiteList.find((e)=>e === item.title)){
+            if(item.children?.length){
+                item.children = customizeRoute([...item.children])
+            }
+            if(item.isMenu){     
+                item.children?.length && customized.push(item)
+            } else{
+                if(item.title === '标注平台'){
+                    customized.push({
+                        ...item,
+                        menu_type: 'out_link',
+                        disable: false,
+                        url: 'http://192.168.1.3:9002'
+                    })
+                } else customized.push(item)
+            } 
+        }
+    }
+    return customized
+}
+
 export const getDefaultOpenKeys = (data: IRouterConfigPlusItem[]) => {
     const openKeys: string[] = []
     const quene = [...data]
