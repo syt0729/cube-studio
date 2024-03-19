@@ -342,7 +342,7 @@ const AppWrapper = (props: IProps) => {
               <div className="cp pr16" style={{ width: 'auto' }} onClick={() => {
                 navigate('/', { replace: true })
               }}>
-                <img style={{ height: 42 }} src={globalConfig.appLogo.default} alt="img" />
+                <img style={{ height: 42 }} src={globalConfig.appLogo} alt="img" />
               </div>
 
               {
@@ -393,6 +393,7 @@ const AppWrapper = (props: IProps) => {
                 setImgUrlProtraits(require('./images/male.png'))
               }} alt="img" />
             </Dropdown>
+            <span> {userName}</span>
           </div>
         </div>
       }
