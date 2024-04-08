@@ -95,6 +95,8 @@ class Project_User_ModelView_Base():
         if "admin" in user_roles:
             return req_json
         creators = db.session().query(Project_User).filter_by(project_id=req_json.get('project')).all()
+        for i in range(0, len(creators)):
+            creators[i] = creators[i].user.username
         if g.user.username not in creators:
             raise MyappException('just creator can add/edit user')
 
