@@ -96,12 +96,12 @@ function get_username() {
     if(!username)
         username =getCookie('mk_user_name') || getCookie('bk_uid') || getCookie('myapp_username');
     if(!username)
-        username ='kubeflow';
+        username ='niii';
     var id = getCookie('id');
     if(!id)
         id='';
     content = username;
-    src = id+" @Cube-Studio";
+    src = id+" @Niii";
     $(document).ready(function(){
         drawWaterMark({content:content,src:src});
     });

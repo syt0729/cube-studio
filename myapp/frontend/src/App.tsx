@@ -9,7 +9,7 @@ import {
 
 import { Drawer, Dropdown, Menu, Select, Spin, Tag } from 'antd';
 import { IRouterConfigPlusItem } from './api/interface/baseInterface';
-import { formatRoute, getDefaultOpenKeys, routerConfigPlus } from './routerConfig';
+import { formatRoute, getDefaultOpenKeys, routerConfigPlus, customizeRoute } from './routerConfig';
 import SubMenu from 'antd/lib/menu/SubMenu';
 import { clearWaterNow, drawWater, drawWaterNow, getParam, obj2UrlParam, parseParam2Obj } from './util'
 import { getAppHeaderConfig, getAppMenu, getCustomDialog, userLogout } from './api/kubeflowApi';
@@ -70,7 +70,8 @@ const AppWrapper = (props: IProps) => {
   useEffect(() => {
     getAppMenu().then(res => {
       const remoteRoute = res.data
-      const dynamicRoute = formatRoute([...remoteRoute])
+      const route = customizeRoute([...remoteRoute])
+      const dynamicRoute = formatRoute([...route])
       const tarRoute = [...dynamicRoute, ...routerConfigPlus]
       const tarRouteMap = getRouterMap(tarRoute)
 
@@ -85,7 +86,7 @@ const AppWrapper = (props: IProps) => {
 
     getAppHeaderConfig().then(res => {
       const config = res.data
-      setHeaderConfig(config)
+      //setHeaderConfig(config)
     }).catch(err => { })
   }, [])
 
@@ -341,7 +342,7 @@ const AppWrapper = (props: IProps) => {
               <div className="cp pr16" style={{ width: 'auto' }} onClick={() => {
                 navigate('/', { replace: true })
               }}>
-                <img style={{ height: 42 }} src={globalConfig.appLogo.default} alt="img" />
+                <img style={{ height: 42 }} src={globalConfig.appLogo} alt="img" />
               </div>
 
               {
@@ -392,6 +393,7 @@ const AppWrapper = (props: IProps) => {
                 setImgUrlProtraits(require('./images/male.png'))
               }} alt="img" />
             </Dropdown>
+            <span> {userName}</span>
           </div>
         </div>
       }
