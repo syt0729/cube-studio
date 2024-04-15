@@ -231,9 +231,9 @@ class Myauthdbview(AuthDBView):
             from myapp.security import MyUserRemoteUserModelView_Base
             user_view = MyUserRemoteUserModelView_Base()
             user_view.post_add(user)
-            # if not user.ls_token:
-            token = signup_labelStudio(user.email, password)
-            update_ls_token(self.appbuilder.sm, token,user)
+            if not user.ls_token:
+                token = signup_labelStudio(user.email, password)
+                update_ls_token(self.appbuilder.sm, token,user)
             return redirect(comed_url if comed_url else self.appbuilder.get_url_for_index)
         return self.render_template(
             self.login_template, title=self.title, form=form, appbuilder=self.appbuilder
