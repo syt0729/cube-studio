@@ -125,7 +125,7 @@ def signup_labelStudio(email,password):
         'content-type':'application/x-www-form-urlencoded',
         'Accept': 'application/json',
     }
-    response = requests.post("http://192.168.1.195:8000/user/externalSignup/", data=urlencode(payload), headers=headers)
+    response = requests.post("http://192.168.1.3:9002/user/externalSignup/", data=urlencode(payload), headers=headers)
     rs = response.json()
     # r = requests.get("http://192.168.1.195:8000/api/projects",headers={'Authorization': 'Token 9e8538db609c1af79c98f772b39abca2571f3325'})
     # t = r.text
