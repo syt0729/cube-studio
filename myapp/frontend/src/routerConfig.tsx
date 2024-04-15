@@ -226,12 +226,13 @@ export const customizeRoute = (data: IAppMenuItem[]):IAppMenuItem[] => {
             if(item.isMenu){     
                 item.children?.length && customized.push(item)
             } else{
+                const url = 'http://192.168.1.3:9002/user/login';
                 if(item.title === '标注平台'){
                     customized.push({
                         ...item,
                         menu_type: 'out_link',
                         disable: false,
-                        url: 'http://192.168.1.3:9002'
+                        url: url
                     })
                 } else customized.push(item)
             } 

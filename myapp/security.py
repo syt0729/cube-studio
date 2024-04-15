@@ -84,7 +84,7 @@ class MyUser(User):
     __tablename__ = 'ab_user'
     org = Column(String(200))   # Organization
     quota = Column(String(2000))  # 资源配额
-
+    ls_token =  Column(String(2000))  # label studio api Token
 
     def get_full_name(self):
         return self.username
@@ -232,7 +232,6 @@ class MyUserRemoteUserModelView_Base():
                 db.session.commit()
         except Exception:
             db.session.rollback()
-
 
 
 class MyUserRemoteUserModelView(MyUserRemoteUserModelView_Base,UserModelView):

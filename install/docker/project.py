@@ -1,9 +1,11 @@
+from urllib.parse import urlencode
 from werkzeug.security import check_password_hash
 from flask_appbuilder.security.views import AuthDBView, AuthRemoteUserView
 from flask_appbuilder.security.views import expose
 from flask_appbuilder.const import LOGMSG_WAR_SEC_LOGIN_FAILED
 from flask import send_file, jsonify
 import os
+import requests
 
 # 推送资源申请消息
 def push_resource_apply(notebook_id=None,pipeline_id=None,task_id=None,service_id=None,**kwargs):
@@ -40,7 +42,6 @@ import pysnooper
 portal_url = 'http://127.0.0.1/xxxx/login?staffCode=admin'
 
 # 自定义远程用户视图
-# @pysnooper.snoop()
 class MyCustomRemoteUserView(AuthRemoteUserView):
 
     @expose('/xx/xx/explorer/login')
@@ -113,14 +114,33 @@ class MyCustomRemoteUserView(AuthRemoteUserView):
         logout_user()
         return redirect(portal_url)
 
+# label studio注册新用户，并获取用户token
+@pysnooper.snoop(prefix="signup_labelStudio here.............: ")
+def signup_labelStudio(email,password):
+    payload = {
+            'email':  email,
+            'password': password
+    }
+    headers = {
+        'content-type':'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+    }
+    response = requests.post("http://192.168.1.195:8000/user/externalSignup/", data=urlencode(payload), headers=headers)
+    rs = response.json()
+    # r = requests.get("http://192.168.1.195:8000/api/projects",headers={'Authorization': 'Token 9e8538db609c1af79c98f772b39abca2571f3325'})
+    # t = r.text
+    return rs.get('token',None)
+
+def update_ls_token(sm, token,user):
+    user.ls_token = "Token "+token
+    sm.update_user(user)
 
 # 账号密码登录方式的登录界面
-
 class Myauthdbview(AuthDBView):
     login_template = "appbuilder/general/security/login_db.html"
 
     @expose("/login/api/", methods=["GET", "POST"])
-    # @pysnooper.snoop(watch_explode=('form',))
+    @pysnooper.snoop(watch_explode=('form',))
     def login_api(self):
         request_data = request.args.to_dict()
         if request.get_json(silent=True):
@@ -147,12 +167,12 @@ class Myauthdbview(AuthDBView):
                     "message": '未发现用户',
                     "result": {}
                 })
-
+   
+    @pysnooper.snoop(prefix="login here.............: ")
     @expose("/login/", methods=["GET", "POST"])
     def login(self):
         request_data = request.args.to_dict()
-        comed_url = request_data.get('login_url', '')
-
+        comed_url = request_data.get('login_url', '')      
         if 'rtx' in request_data:
             if request_data.get('rtx'):
                 username = request_data.get('rtx')
@@ -211,6 +231,9 @@ class Myauthdbview(AuthDBView):
             from myapp.security import MyUserRemoteUserModelView_Base
             user_view = MyUserRemoteUserModelView_Base()
             user_view.post_add(user)
+            # if not user.ls_token:
+            token = signup_labelStudio(user.email, password)
+            update_ls_token(self.appbuilder.sm, token,user)
             return redirect(comed_url if comed_url else self.appbuilder.get_url_for_index)
         return self.render_template(
             self.login_template, title=self.title, form=form, appbuilder=self.appbuilder
@@ -223,4 +246,3 @@ class Myauthdbview(AuthDBView):
         g.user = None
         logout_user()
         return redirect(login_url)
-
