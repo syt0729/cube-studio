@@ -566,7 +566,7 @@ class MyappModelRestApi(ModelRestApi):
                     print(e)
 
     # 根据columnsfields 转化为 info的json信息
-    # @pysnooper.snoop()
+    @pysnooper.snoop(prefix="columnsfield2info here.............: ")
     def columnsfield2info(self, columnsfields):
         ret = list()
         for col_name in columnsfields:
@@ -624,7 +624,7 @@ class MyappModelRestApi(ModelRestApi):
         # print(self.user_permissions)
         response[API_USER_PERMISSIONS_RIS_KEY] = self.user_permissions
 
-    # @pysnooper.snoop()
+    #@pysnooper.snoop(prefix="merge_expand_field_info here.............: ")
     def merge_expand_field_info(self,columns):
         # print(len(columns))
         if not self.expand_columns:
@@ -650,7 +650,7 @@ class MyappModelRestApi(ModelRestApi):
         return new_columns
 
     # add_form_extra_fields  里面的字段要能拿到才对
-    # @pysnooper.snoop(watch_explode=())
+    #@pysnooper.snoop(prefix="merge_add_field_info here.............: ")
     def merge_add_field_info(self, response, **kwargs):
         _kwargs = kwargs.get("add_columns", {})
         # 将关联字段的查询限制条件加入
@@ -667,7 +667,7 @@ class MyappModelRestApi(ModelRestApi):
 
         response[API_ADD_COLUMNS_RES_KEY] = add_columns
 
-    # @pysnooper.snoop(watch_explode=('edit_columns'))
+    #@pysnooper.snoop(prefix="merge_edit_field_info here.............: ")
     def merge_edit_field_info(self, response, **kwargs):
         _kwargs = kwargs.get("edit_columns", {})
         if self.edit_form_query_rel_fields:
@@ -911,7 +911,7 @@ class MyappModelRestApi(ModelRestApi):
         response['primary_key'] = self.primary_key
         response['label_title'] = self.label_title or self._prettify_name(self.datamodel.model_name)
 
-    # @pysnooper.snoop(watch_explode=())
+    @pysnooper.snoop(prefix="merge_related_field_info here.............: ")
     # 添加关联model的字段
     def merge_related_field_info(self, response, **kwargs):
         try:
@@ -1903,7 +1903,7 @@ class MyappModelRestApi(ModelRestApi):
 
         return ret
 
-    # @pysnooper.snoop(watch_explode=('ret'))
+    #@pysnooper.snoop(prefix="filed2ui here.............: ")
     def filed2ui(self,column_name,column_field,ret_src={}):
         ret = copy.deepcopy(ret_src)
         column_field_kwargs = column_field.kwargs
@@ -1969,7 +1969,7 @@ class MyappModelRestApi(ModelRestApi):
                     ret['choices'] = [[x, x] for x in list(set(field_contents))]
         return ret
 
-    # @pysnooper.snoop(watch_explode=('field_contents'))
+    @pysnooper.snoop(prefix="_get_field_info here.............: ")
     def _get_field_info(self, field, filter_rel_field, page=None, page_size=None):
         """
             Return a dict with field details
@@ -2019,6 +2019,8 @@ class MyappModelRestApi(ModelRestApi):
             ret["remember"] = False
         ret["label"] = self.label_columns.get(field.name, "")
         ret["description"] = self.description_columns.get(field.name, "")
+        def contains_validator(validators_list, validator_type):
+            return any(isinstance(validator, validator_type) for validator in validators_list)
         if field.validate and isinstance(field.validate, list):
             ret["validators"] = [v for v in field.validate]
         elif field.validate:
@@ -2031,7 +2033,8 @@ class MyappModelRestApi(ModelRestApi):
             ret["count"], ret["values"] = self._get_list_related_field(
                 field, filter_rel_field, page=page, page_size=page_size
             )
-            ret["validators"].append(validators.DataRequired())
+            if not contains_validator(ret.get("validators", []), validators.DataRequired):
+                ret["validators"].append(validators.DataRequired())
 
         # 如果是外键，都加必填
         # if
@@ -2052,7 +2055,8 @@ class MyappModelRestApi(ModelRestApi):
         columns = [column for column in self.datamodel.obj.__table__._columns if column.name == field.name and hasattr(column, 'nullable') and not column.nullable]
         if columns:
             if 'validators' in ret:
-                ret['validators'].append(validators.DataRequired())
+                if not contains_validator(ret.get("validators", []), validators.DataRequired):
+                    ret["validators"].append(validators.DataRequired())
             else:
                 ret['validators'] = [validators.DataRequired()]
 
