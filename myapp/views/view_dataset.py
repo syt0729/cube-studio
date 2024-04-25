@@ -1,7 +1,7 @@
 import datetime
 import re
 import shutil
-
+from urllib.parse import urlencode
 from flask_appbuilder import action
 from myapp.views.baseSQLA import MyappSQLAInterface as SQLAInterface
 from wtforms.validators import DataRequired, Regexp
@@ -29,7 +29,7 @@ from myapp import app, appbuilder, db
 from flask_appbuilder import expose
 from myapp.views.view_team import Project_Join_Filter, filter_join_org_project
 from myapp.models.model_dataset import Dataset
-
+import requests
 conf = app.config
 
 
@@ -277,7 +277,7 @@ class Dataset_ModelView_base():
     import_data = True
     download_data = True
 
-    def pre_add(self, item):
+    def pre_add(self, item):  
         if not item.owner:
             item.owner = g.user.username + ",*"
         if not item.icon:
@@ -287,9 +287,37 @@ class Dataset_ModelView_base():
         if not item.subdataset:
             item.subdataset = item.name
 
+    def post_add(self, item):
+        self.sync_label_studio(item)
+
+    def pre_delete(self, item):
+        self.sync_label_studio(item, 'D')
+
+    @pysnooper.snoop()
+    def sync_label_studio(self, item, OpType = 'CR'):
+            payload = {
+                'name': item.name,
+                'id': item.id ,
+                'OpType': OpType
+            }
+            if OpType == "M":
+                owner = self.src_item_json.get('owner')
+                if not owner == item.owner:
+                    payload['owner'] = item.owner
+            elif OpType == 'CR':
+                payload['owner'] = item.owner
+            
+            ls_token = g.user.ls_token
+            headers = {
+                'content-type':'application/x-www-form-urlencoded',
+                'Accept': 'application/json',
+                'Authorization': ls_token
+            }
+            requests.post("http://192.168.1.195:8000/api/projects/sync-dataset", data=urlencode(payload), headers=headers)
+
     def pre_update(self, item):
         self.pre_add(item)
-
+        self.sync_label_studio(item, 'M')
 
     def check_edit_permission(self, item):
         if not g.user.is_admin() and g.user.username != item.created_by.username and g.user.username not in item.owner:
