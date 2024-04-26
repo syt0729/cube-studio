@@ -298,7 +298,8 @@ class Dataset_ModelView_base():
             payload = {
                 'name': item.name,
                 'id': item.id ,
-                'OpType': OpType
+                'OpType': OpType,
+                'description': item.describe
             }
             if OpType == "M":
                 owner = self.src_item_json.get('owner')

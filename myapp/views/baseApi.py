@@ -566,7 +566,7 @@ class MyappModelRestApi(ModelRestApi):
                     print(e)
 
     # 根据columnsfields 转化为 info的json信息
-    @pysnooper.snoop(prefix="columnsfield2info here.............: ")
+    # @pysnooper.snoop(prefix="columnsfield2info here.............: ")
     def columnsfield2info(self, columnsfields):
         ret = list()
         for col_name in columnsfields:
@@ -911,7 +911,7 @@ class MyappModelRestApi(ModelRestApi):
         response['primary_key'] = self.primary_key
         response['label_title'] = self.label_title or self._prettify_name(self.datamodel.model_name)
 
-    @pysnooper.snoop(prefix="merge_related_field_info here.............: ")
+    # @pysnooper.snoop(prefix="merge_related_field_info here.............: ")
     # 添加关联model的字段
     def merge_related_field_info(self, response, **kwargs):
         try:
@@ -1969,7 +1969,7 @@ class MyappModelRestApi(ModelRestApi):
                     ret['choices'] = [[x, x] for x in list(set(field_contents))]
         return ret
 
-    @pysnooper.snoop(prefix="_get_field_info here.............: ")
+    # @pysnooper.snoop(prefix="_get_field_info here.............: ")
     def _get_field_info(self, field, filter_rel_field, page=None, page_size=None):
         """
             Return a dict with field details
