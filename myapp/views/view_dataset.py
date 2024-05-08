@@ -314,7 +314,8 @@ class Dataset_ModelView_base():
                 'Accept': 'application/json',
                 'Authorization': ls_token
             }
-            requests.post("http://192.168.1.195:8000/api/projects/sync-dataset", data=urlencode(payload), headers=headers)
+            ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://localhost:9002')
+            requests.post(ls_domain+"/api/projects/sync-dataset", data=urlencode(payload), headers=headers)
 
     def pre_update(self, item):
         self.pre_add(item)
