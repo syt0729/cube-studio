@@ -9,7 +9,7 @@ import urllib.parse
 import os
 from flask import Markup, Response, current_app, make_response, send_file, flash, g, jsonify, request
 from inspect import isfunction
-
+from myapp.utils.core import ValidUserListValidator
 from sqlalchemy import create_engine
 from flask_appbuilder.actions import action
 from flask_babel import gettext as __
@@ -1844,6 +1844,8 @@ class MyappModelRestApi(ModelRestApi):
             elif type(v) == validators.NumberRange or type(v) == validate.Range:
                 val['min'] = v.min
                 val['max'] = v.max
+            elif type(v) == ValidUserListValidator:
+                val['validNames'] = ', '.join(v.valid_usernames)
             else:
                 pass
 
@@ -1969,7 +1971,7 @@ class MyappModelRestApi(ModelRestApi):
                     ret['choices'] = [[x, x] for x in list(set(field_contents))]
         return ret
 
-    # @pysnooper.snoop(prefix="_get_field_info here.............: ")
+    @pysnooper.snoop(prefix="_get_field_info here.............: ")
     def _get_field_info(self, field, filter_rel_field, page=None, page_size=None):
         """
             Return a dict with field details
