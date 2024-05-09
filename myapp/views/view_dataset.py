@@ -26,13 +26,14 @@ from .base import (
     MyappModelView,
 )
 from myapp import app, appbuilder, db
+from myapp.security import MyUser
 from flask_appbuilder import expose
 from myapp.views.view_team import Project_Join_Filter, filter_join_org_project
 from myapp.models.model_dataset import Dataset
 import requests
 conf = app.config
 
-
+from myapp.utils.core import ValidUserListValidator
 class Dataset_Filter(MyappFilter):
     # @pysnooper.snoop()
     def apply(self, query, func):
@@ -117,6 +118,8 @@ class Dataset_ModelView_base():
         "icon_html": {"type": "ellip1", "width": 100},
         "ops_html": {"type": "ellip1", "width": 200},
     }
+    # 从数据库中获取所有有效用户名
+    valid_usernames = {user.username for user in db.session.query(MyUser).all()}
     features_demo = '''
 {
   "column1": {
@@ -239,7 +242,7 @@ class Dataset_ModelView_base():
             default='*',
             description= _('责任人,逗号分隔的多个用户,*表示公开'),
             widget=BS3TextFieldWidget(),
-            validators=[DataRequired()]
+            validators=[DataRequired(),ValidUserListValidator(valid_usernames)]
         ),
         "status": SelectField(
             label= _('状态'),
@@ -293,7 +296,7 @@ class Dataset_ModelView_base():
     def pre_delete(self, item):
         self.sync_label_studio(item, 'D')
 
-    @pysnooper.snoop()
+    #@pysnooper.snoop()
     def sync_label_studio(self, item, OpType = 'CR'):
             payload = {
                 'name': item.name,

@@ -48,6 +48,7 @@ import math
 from myapp.exceptions import MyappException, MyappTimeoutException
 from myapp.utils.dates import datetime_to_epoch, EPOCH
 import re
+from wtforms.validators import ValidationError
 
 PY3K = sys.version_info >= (3, 0)
 DTTM_ALIAS = "__timestamp"
@@ -2117,3 +2118,20 @@ def test_database_connection(url):
         return True
     except OperationalError:
         return False
+class ValidUserListValidator:
+    def __init__(self, valid_usernames, message=None):
+        self.message = message or _("Owner field contains invalid usernames or is not '*'")
+        self.valid_usernames = valid_usernames
+    @pysnooper.snoop(watch_explode=('valid_usernames'))
+    def __call__(self, form, field):
+        if field.data == '*':
+            # '*' 是一个特殊值，表示所有用户都是责任人
+            return
+
+        # 解析owner字段，检查每个用户名是否有效
+        owners = [owner.strip() for owner in field.data.split(',') if owner.strip()]
+        invalid_owners = [owner for owner in owners if owner not in self.valid_usernames]
+
+        if invalid_owners:
+            # 如果存在无效用户名，抛出验证错误
+            raise ValidationError(self.message + ": " + ", ".join(invalid_owners))           

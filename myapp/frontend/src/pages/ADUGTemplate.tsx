@@ -152,6 +152,25 @@ export default function TaskListManager(props?: IAppMenuItem) {
         }
     }, [])
 
+    const getUsernameValidator = (validUsernames: string[])=>{
+        return function usernameValidator(rule: any, value: string) {
+            if (!value || value=== "*") {
+              return Promise.resolve(); // 没有输入时校验通过
+            }
+            // 将输入的字符串按逗号分割，并去除空白字符
+            const usernames = value.split(',').map(username => username.trim());
+            // 检查是否有无效的用户名
+            const invalidUsernames = usernames.filter(username => {
+              return !validUsernames.includes(username);
+            });
+            if (invalidUsernames.length > 0) {
+              // 返回的 Promise 被 reject，表示校验失败
+              return Promise.reject(`${t('请输入正确的用户名')}`);
+            }
+            // 返回的 Promise 被 resolve，表示校验通过
+            return Promise.resolve();
+        }
+    }
     const createDyFormConfig = (data: Record<string, any>[], label_columns: Record<string, any>, description_columns: Record<string, any>): IDynamicFormConfigItem[] => {
         return data.map((item, index) => {
             let type = item['ui-type'] || 'input'
@@ -176,6 +195,8 @@ export default function TaskListManager(props?: IAppMenuItem) {
                         return { pattern: new RegExp(`${item.regex}`), message: `${t('请按正确的规则输入')}` }
                     case 'Length':
                         return { min: item.min || 0, max: item.max, message: `${t('请输入正确的长度')}` }
+                    case 'ValidUserListValidator':
+                        return { validator: getUsernameValidator(item.validNames.split(/,\s+/))}
                     default:
                         return undefined
                 }
