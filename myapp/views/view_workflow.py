@@ -872,7 +872,7 @@ class Workflow_ModelView_Base(Crd_ModelView_Base):
                     {
                         "groupName": "",
                         "groupContent": {
-                            "value": Markup("提示：仅企业版支持任务结果、模型指标、数据集可视化预览"),
+                            "value": Markup("No chart available."),
                             # options的值
                             "type": 'html'
                         }
@@ -883,29 +883,49 @@ class Workflow_ModelView_Base(Crd_ModelView_Base):
             },
         ]
         if not metric_content:
-            echart_demos_file = os.listdir('myapp/utils/echart/')
-            for file in echart_demos_file:
-                # print(file)
-                file_path = os.path.join('myapp/utils/echart/',file)
-                can = ['area-stack.json', 'rose.json', 'mix-line-bar.json', 'pie-nest.json', 'bar-stack.json',
-                       'candlestick-simple.json', 'graph-simple.json', 'tree-polyline.json', 'sankey-simple.json',
-                       'radar.json', 'sunburst-visualMap.json', 'parallel-aqi.json', 'funnel.json',
-                       'sunburst-visualMap.json', 'scatter-effect.json']
-                not_can = ['bar3d-punch-card.json', 'simple-surface.json']# 不行的。
-
-                # if '.json' in file and file in []:
-                if '.json' in file and file in can:
-                    echart_option = ''.join(open(file_path).readlines())
-                    # print(echart_option)
-                    tab7[0]['content'].append(
-                        {
-                            "groupName": __("任务结果示例：")+file.replace('.json','')+__("类型图表"),
-                            "groupContent": {
-                                "value": echart_option,  # options的值
-                                "type": 'echart'
-                            }
+            # echart_demos_file = os.listdir('myapp/utils/echart/')
+            if int(layout_config.get("pipeline-id", '0')):
+                pipeline = db.session.query(Pipeline).filter_by(id=int(layout_config.get("pipeline-id", '0'))).first()
+            creator = pipeline.created_by.username
+            echart_file_path = os.path.join('/data/k8s/kubeflow/pipeline/workspace/', str(creator), pod_name)
+            if not os.path.exists(echart_file_path):
+                tab7[0]['content'] = [
+                    {
+                        "groupName": "",
+                        "groupContent": {
+                            "value": Markup("No chart available."),
+                            # options的值
+                            "type": 'html'
                         }
-                    )
+                    }
+
+                ]
+            else:
+                tab7[0]['content'] = []
+                echart_files = os.listdir(echart_file_path)
+                for file in echart_files:
+                    # print(file)
+                    # file_path = os.path.join('myapp/utils/echart/',file)
+                    file_path = os.path.join(echart_file_path,file)
+                    can = ['area-stack.json', 'rose.json', 'mix-line-bar.json', 'pie-nest.json', 'bar-stack.json',
+                        'candlestick-simple.json', 'graph-simple.json', 'tree-polyline.json', 'sankey-simple.json',
+                        'radar.json', 'sunburst-visualMap.json', 'parallel-aqi.json', 'funnel.json',
+                        'sunburst-visualMap.json', 'scatter-effect.json']
+                    not_can = ['bar3d-punch-card.json', 'simple-surface.json']# 不行的。
+
+                    # if '.json' in file and file in []:
+                    if '.json' in file and file in can:
+                        echart_option = ''.join(open(file_path).readlines())
+                        # print(echart_option)
+                        tab7[0]['content'].append(
+                            {
+                                "groupName": __("任务结果示例：")+file.replace('.json','')+__("类型图表"),
+                                "groupContent": {
+                                    "value": echart_option,  # options的值
+                                    "type": 'echart'
+                                }
+                            }
+                        )
 
         tab8 = [
             {
