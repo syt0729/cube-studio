@@ -119,7 +119,7 @@ class InferenceService_ModelView_base():
         # "host": __("域名：测试环境test.xx，调试环境 debug.xx"),
     }
     service_type_choices = [x.replace('_','-') for x in service_type_choices]
-    host_rule=",<br>".join([cluster+"cluster:*."+conf.get('CLUSTERS')[cluster].get("SERVICE_DOMAIN",conf.get('SERVICE_DOMAIN','')) for cluster in conf.get('CLUSTERS') if conf.get('CLUSTERS')[cluster].get("SERVICE_DOMAIN",conf.get('SERVICE_DOMAIN',''))])
+    host_rule=",<br>".join([cluster+"cluster:*."+conf.get('CLUSTERS', {})[cluster].get("SERVICE_DOMAIN",conf.get('SERVICE_DOMAIN','')) for cluster in conf.get('CLUSTERS', {}) if conf.get('CLUSTERS', {})[cluster].get("SERVICE_DOMAIN",conf.get('SERVICE_DOMAIN',''))])
     add_form_extra_fields={
         "project": QuerySelectField(
             _('项目组'),
