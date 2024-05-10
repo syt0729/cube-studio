@@ -8,7 +8,7 @@ import { CopyOutlined, DownOutlined, ExclamationCircleOutlined, ExportOutlined, 
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getParam, getTableScroll } from '../util';
 import ModalForm from '../components/ModalForm/ModalForm';
-import cookies from 'js-cookie';
+
 import { IADUGTemplateActionItem, IAppMenuItem } from '../api/interface/kubeflowInterface';
 import { getADUGTemplateList, getADUGTemplateApiInfo, actionADUGTemplateDelete, getADUGTemplateDetail, actionADUGTemplateAdd, actionADUGTemplateUpdate, actionADUGTemplateSingle, actionADUGTemplateMuliple, actionADUGTemplateRetryInfo, actionADUGTemplateFavorite, actionADUGTemplateCancelFavorite, actionADUGTemplateChartOption } from '../api/kubeflowApi';
 import { ColumnsType } from 'antd/lib/table';
