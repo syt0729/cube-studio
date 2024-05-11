@@ -70,7 +70,8 @@ from flask_appbuilder.api import BaseModelApi, BaseApi, ModelRestApi
 from sqlalchemy.sql import sqltypes
 from myapp import app, appbuilder, db, event_logger, cache
 from myapp.models.favorite import Favorite
-
+from myapp.security import MyUser
+from myapp.utils.core import get_valid_usernames
 conf = app.config
 
 API_COLUMNS_INFO_RIS_KEY = 'columns_info'
@@ -1845,7 +1846,7 @@ class MyappModelRestApi(ModelRestApi):
                 val['min'] = v.min
                 val['max'] = v.max
             elif type(v) == ValidUserListValidator:
-                val['validNames'] = ', '.join(v.valid_usernames)
+                val['validNames'] = get_valid_usernames(db, MyUser)
             else:
                 pass
 
@@ -1971,7 +1972,7 @@ class MyappModelRestApi(ModelRestApi):
                     ret['choices'] = [[x, x] for x in list(set(field_contents))]
         return ret
 
-    @pysnooper.snoop(prefix="_get_field_info here.............: ")
+    #@pysnooper.snoop(prefix="_get_field_info here.............: ")
     def _get_field_info(self, field, filter_rel_field, page=None, page_size=None):
         """
             Return a dict with field details

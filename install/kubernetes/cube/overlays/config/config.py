@@ -84,6 +84,9 @@ LOGO_TARGET_PATH = None
 # AUTH_REMOTE_USER : 远程用户认证
 AUTH_TYPE = AUTH_DB
 
+# label studio的ip 地址
+LABEL_STUDIO_IP = "http://192.168.1.195"
+
 # AUTH_TYPE = AUTH_REMOTE_USER
 # Uncomment to setup Full admin role name
 # AUTH_ROLE_ADMIN = 'Admin'
