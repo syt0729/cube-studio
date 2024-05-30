@@ -73,7 +73,8 @@ APP_ICON_WIDTH = 126
 # 配置logo点击后的跳转链接，例如'/welcome'  会跳转到'/myapp/welcome'
 LOGO_TARGET_PATH = None
 
-
+# label studio的ip 地址
+LABEL_STUDIO_IP = "http://192.168.1.195"
 # ----------------------------------------------------
 # 认证相关的配置
 # ----------------------------------------------------
