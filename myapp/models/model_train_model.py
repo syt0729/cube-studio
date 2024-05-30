@@ -65,6 +65,13 @@ class Training_Model(Model,AuditMixinNullable,MyappModelBase):
         return Markup(ops)
 
     @property
+    def download(self):
+        ops=f'''
+        <a href="/training_model_modelview/api/download/{self.id}">{__("下载")}</a> 
+        '''
+        return Markup(ops)
+    
+    @property
     def model_metric(self):
         try:
             metric_list = json.loads(self.metrics) if self.metrics else {}

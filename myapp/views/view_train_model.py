@@ -1,6 +1,7 @@
 from myapp.views.baseSQLA import MyappSQLAInterface as SQLAInterface
 from myapp.models.model_train_model import Training_Model
 from myapp.models.model_serving import InferenceService
+from myapp.security import MyUser
 from flask_babel import gettext as __
 from flask_babel import lazy_gettext as _
 from myapp import app, appbuilder, db
@@ -14,7 +15,8 @@ from myapp.forms import MyBS3TextFieldWidget
 from flask import (
     flash,
     g,
-    redirect
+    redirect,
+    send_file, request, make_response, jsonify
 )
 from .base import (
     DeleteMixin,
@@ -25,9 +27,11 @@ from .baseApi import (
     MyappModelRestApi
 )
 
-from flask_appbuilder import expose
+from flask_appbuilder import expose, action
 import datetime, json
-
+import pysnooper
+import os
+import hashlib
 conf = app.config
 
 
@@ -46,7 +50,7 @@ class Training_Model_ModelView_Base():
     base_order = ('changed_on', 'desc')
     order_columns = ['id']
     list_columns = ['project_url', 'name', 'version', 'model_metric', 'framework', 'api_type', 'pipeline_url',
-                    'creator', 'modified', 'deploy']
+                    'creator', 'modified', 'deploy', 'download']
     search_columns = ['created_by', 'project', 'name', 'version', 'framework', 'api_type', 'pipeline_id', 'run_id',
                       'path']
     add_columns = ['project', 'name', 'version', 'describe', 'path', 'framework', 'run_id', 'run_time', 'metrics',
@@ -64,13 +68,15 @@ class Training_Model_ModelView_Base():
         "version": {"type": "ellip2", "width": 200},
         "modified": {"type": "ellip2", "width": 150},
         "deploy": {"type": "ellip2", "width": 100},
+        "donwload": {"type": "ellip2", "width": 100},
         "model_metric": {"type": "ellip2", "width": 300},
     }
     spec_label_columns = {
         "path": _("模型文件"),
         "framework": _("训练框架"),
         "api_type": _("推理框架"),
-        "deploy": _("发布")
+        "deploy": _("发布"),
+        "download":_("下载")
     }
 
     label_title = _('模型')
@@ -163,6 +169,78 @@ triton-server：框架:地址。onnx:模型文件地址model.onnx，pytorch:torc
         if not item.path:
             item.path = self.src_item_json['path']
         self.pre_add(item)
+
+    def checkDownloadAuthorization(self, request_headers):
+        _keys = request_headers.keys()
+        if 'Username' in _keys and 'Token' in _keys:
+            _response_401 = make_response('Authorization failed!')
+            _response_401.status_code = 401
+            user_name = request_headers['Username']
+            token = request_headers['Token']
+            password = db.session.query(MyUser).filter_by(username=user_name).first().password
+            if not token == hashlib.sha256(password.encode('utf-8')).hexdigest():
+                return False
+        else:
+            return False
+        return True
+    
+    # for api user
+    @expose("/query/version/<model_name>", methods=["GET"])
+    def query_model_version(self, model_name):
+        request_headers = dict(request.headers)
+        _response_401 = make_response('Authorization failed!')
+        _response_401.status_code = 401
+        if not self.checkDownloadAuthorization(request_headers):
+            return _response_401
+
+        model_list = {}
+        train_models = db.session.query(Training_Model).filter_by(name=model_name).all()
+        if len(train_models) == 0:
+            _response = make_response('no model found')
+            _response.status_code = 404
+            return _response
+        for model in train_models:
+            id = model.id
+            version = model.version
+            model_list[id] = version
+        return json.dumps(model_list)
+
+    # for api user
+    @expose("/download/api/<model_id>", methods=["GET"])
+    def download_from_api(self, model_id):
+        request_headers = dict(request.headers)
+        _response_401 = make_response('Authorization failed!')
+        _response_401.status_code = 401
+        if not self.checkDownloadAuthorization(request_headers):
+            return _response_401
+
+        train_model = db.session.query(Training_Model).filter_by(id=model_id).first()
+        model_path = train_model.path
+        dir_prefix = '/data/k8s/kubeflow/pipeline/workspace/'
+        url = dir_prefix
+        if model_path.startswith('/mnt'):
+            url = os.path.join(dir_prefix, model_path.strip('/mnt'))
+        if not os.path.isfile(url):
+            url = conf.get('MODEL_URLS', {}).get('train_model', '') # + '?filter=[{"key":"created_by","value":1}]'
+            return redirect(url)
+        return send_file(url, as_attachment=True)
+
+    #for browser user
+    @expose("/download/browser/<model_id>", methods=["GET"])
+    @pysnooper.snoop()
+    def download_from_browser(self, model_id):
+        train_model = db.session.query(Training_Model).filter_by(id=model_id).first()
+        model_path = train_model.path
+        dir_prefix = '/data/k8s/kubeflow/pipeline/workspace/'
+        url = dir_prefix
+        if model_path.startswith('/mnt'):
+            url = os.path.join(dir_prefix, model_path.strip('/mnt'))
+        if not os.path.isfile(url):
+            flash(__('model not exist'), 'error')
+            url = conf.get('MODEL_URLS', {}).get('train_model', '') # + '?filter=[{"key":"created_by","value":1}]'
+            return redirect(url)
+        else:
+            return (send_file(url, as_attachment=True))
 
     @expose("/deploy/<model_id>", methods=["GET", 'POST'])
     def deploy(self, model_id):
