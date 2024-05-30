@@ -74,7 +74,7 @@ APP_ICON_WIDTH = 126
 LOGO_TARGET_PATH = None
 
 # label studio的ip 地址
-LABEL_STUDIO_IP = "http://192.168.1.195"
+LABEL_STUDIO_IP = "http://192.168.1.249"
 # ----------------------------------------------------
 # 认证相关的配置
 # ----------------------------------------------------
@@ -926,6 +926,6 @@ CLUSTERS={
     }
 }
 
-LABEL_STUDIO_DOMAIN_NAME="http://192.168.1.195:8000"
+LABEL_STUDIO_DOMAIN_NAME="http://192.168.1.249:9002"
 
 HOST = CLUSTERS[ENVIRONMENT].get('HOST',None)
