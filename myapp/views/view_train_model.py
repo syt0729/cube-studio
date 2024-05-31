@@ -227,7 +227,7 @@ triton-server：框架:地址。onnx:模型文件地址model.onnx，pytorch:torc
 
     #for browser user
     @expose("/download/browser/<model_id>", methods=["GET"])
-    @pysnooper.snoop()
+    # @pysnooper.snoop()
     def download_from_browser(self, model_id):
         train_model = db.session.query(Training_Model).filter_by(id=model_id).first()
         model_path = train_model.path

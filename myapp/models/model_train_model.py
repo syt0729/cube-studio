@@ -67,7 +67,7 @@ class Training_Model(Model,AuditMixinNullable,MyappModelBase):
     @property
     def download(self):
         ops=f'''
-        <a href="/training_model_modelview/api/download/{self.id}">{__("下载")}</a> 
+        <a href="/training_model_modelview/api/download/browser/{self.id}">{__("下载")}</a> 
         '''
         return Markup(ops)
     
