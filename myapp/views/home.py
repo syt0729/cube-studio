@@ -7,18 +7,16 @@ from flask import g
 import pysnooper
 import datetime
 from flask import jsonify
-from myapp import conf
+from myapp import conf, appbuilder
 from myapp.views.base import BaseMyappView
 
 from flask_appbuilder import expose
-from myapp import appbuilder
 from flask import stream_with_context, request
 
 
 class Myapp(BaseMyappView):
     route_base = '/myapp'
     default_view = 'welcome'  # 设置进入蓝图的默认访问视图（没有设置网址的情况下）
-
     # @expose('/welcome')
     # @expose('/profile/<username>/')
     # def welcome(self, username=None):
@@ -70,7 +68,7 @@ class Myapp(BaseMyappView):
 
     @expose('/menu')
     def menu(self):
-
+        ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://localhost:9002')
         # 项目空间
         projetc = {
             "name": 'group',
@@ -234,9 +232,9 @@ class Myapp(BaseMyappView):
                                 "name": 'label_platform',
                                 "title": __('标注平台'),
                                 "icon": '<svg t="1658320508784" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="3263" width="200" height="200"><path d="M875.65 912h-380a36 36 0 0 1 0-72h380a36 36 0 1 1 0 72zM812.26 284.82L285.39 811.69l-88.11 15.1L212 738l526.72-526.72 73.54 73.54m90.51-11.31L750 120.77a16 16 0 0 0-22.62 0L152.5 695.68a34.11 34.11 0 0 0-9.5 18.56l-25.95 156.23a32 32 0 0 0 37 36.78l155.38-26.62a34.2 34.2 0 0 0 18.38-9.52l575-575a16 16 0 0 0 0-22.63z" p-id="3264"></path></svg>',
-                                "menu_type": "api",
-                                "disable": True,
-                                "url": "/metadata_table_modelview/api/"
+                                "menu_type": "out_link",
+                                "disable": False,
+                                "url": ls_domain
                             }
                         ]
                     },
