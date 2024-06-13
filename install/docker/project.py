@@ -4,24 +4,14 @@ from flask_appbuilder.security.views import AuthDBView, AuthRemoteUserView
 from flask_appbuilder.security.views import expose
 from flask_appbuilder.const import LOGMSG_WAR_SEC_LOGIN_FAILED
 from flask import send_file, jsonify
+
 import os
 import requests
-
-# 推送资源申请消息
-def push_resource_apply(notebook_id=None,pipeline_id=None,task_id=None,service_id=None,**kwargs):
-    from myapp.models.model_job import Task,Pipeline
-    from myapp.models.model_notebook import Notebook
-    from myapp.models.model_serving import InferenceService
-
-    pass
-
-# 推送资源审批消息
-def push_resource_approve(notebook_id=None,pipeline_id=None,task_id=None,service_id=None,**kwargs):
-    from myapp.models.model_job import Task,Pipeline
-    from myapp.models.model_notebook import Notebook
-    from myapp.models.model_serving import InferenceService
-
-    pass
+import logging
+from flask import flash, g, redirect, request, session
+from flask_login import login_user, logout_user
+from flask_appbuilder.security.forms import LoginForm_db
+import pysnooper
 
 # 推送给管理员消息的函数
 def push_admin(message):
@@ -32,91 +22,12 @@ def push_admin(message):
 def push_message(receivers, message, link=None):
     pass
 
-
-import logging
-from flask import flash, g, redirect, request, session
-from flask_login import login_user, logout_user
-from flask_appbuilder.security.forms import LoginForm_db
-import pysnooper
-
-portal_url = 'http://127.0.0.1/xxxx/login?staffCode=admin'
-
-# 自定义远程用户视图
 class MyCustomRemoteUserView(AuthRemoteUserView):
-
-    @expose('/xx/xx/explorer/login')
-    @pysnooper.snoop(watch_explode=('request_data',))
-    def login(self):
-
-        request_data = request.args.to_dict()
-
-        username = request_data.get('staffCode','').lower().replace('_','-').replace('.','')
-        if not username:
-            print('no find user')
-            return redirect(portal_url)
-        # 处理特殊符号
-        email = ''
-        if '@' in username:
-            email = username
-            username = username[:username.index('@')]
-
-        # 先查询用户是否存在
-        if email:
-            user = self.appbuilder.sm.find_user(email=email)
-        else:
-            user = self.appbuilder.sm.find_user(username=username)
-
-        if user and (not user.is_active):
-            logging.info(LOGMSG_WAR_SEC_LOGIN_FAILED.format(username))
-            print('用户未激活，联系管理员激活')
-            flash('user not active',category='warning')
-            return redirect(portal_url)
-
-        if not user:
-            # 没有用户的时候自动注册用户
-            user = self.appbuilder.sm.auth_user_remote_org_user(
-                username=username,
-                org_name='',
-                password='123456',
-                email=email,
-                first_name=username.split('.')[0] if '.' in username else username,
-                last_name=username.split('.')[1] if '.' in username else username
-            )
-            flash('发现用户%s不存在，已自动注册' % username, "success")
-        if not user:
-            return redirect(portal_url)
-        login_user(user, remember=True)
-        # 添加到public项目组
-        from myapp.security import MyUserRemoteUserModelView_Base
-        user_view = MyUserRemoteUserModelView_Base()
-        user_view.post_add(user)
-        res = redirect('/frontend/')
-        res.set_cookie('myapp_username', username)  # 让前端认为也成功了
-        return res
-        # return redirect(self.appbuilder.get_url_for_index)
-
-    @expose('/login/')
-    def _login(self):
-        if 'rtx' in request.args:
-            if request.args.get('rtx'):
-                username = request.args.get('rtx')
-                user = self.appbuilder.sm.find_user(username)
-                if user:
-                    login_user(user, remember=True)
-                    return redirect(self.appbuilder.get_url_for_index)
-
-        return redirect(portal_url)
-
-    @expose('/logout')
-    # @pysnooper.snoop()
-    def logout(self):
-        session.pop('user', None)
-        logout_user()
-        return redirect(portal_url)
+    pass
 
 # label studio注册新用户，并获取用户token
 @pysnooper.snoop(prefix="signup_labelStudio here.............: ")
-def signup_labelStudio(email,password):
+def signup_labelStudio(email,password,ls_domain):
     payload = {
             'email':  email,
             'password': password
@@ -125,20 +36,26 @@ def signup_labelStudio(email,password):
         'content-type':'application/x-www-form-urlencoded',
         'Accept': 'application/json',
     }
-    response = requests.post("http://192.168.1.249:9002/user/externalSignup/", data=urlencode(payload), headers=headers)
+    response = requests.post(ls_domain+"/user/externalSignup/", data=urlencode(payload), headers=headers)
     rs = response.json()
-    # r = requests.get("http://192.168.1.3:9002/api/projects",headers={'Authorization': 'Token 9e8538db609c1af79c98f772b39abca2571f3325'})
-    # t = r.text
     return rs.get('token',None)
 
 def update_ls_token(sm, token,user):
     user.ls_token = "Token "+token
     sm.update_user(user)
 
+def logout_labelStudio(ls_domain):
+    ls_token = g.user.ls_token
+    headers = {
+        'content-type':'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'Authorization': ls_token
+    }
+    requests.post(ls_domain+"/user/external_logout/", headers=headers)    
+
 # 账号密码登录方式的登录界面
 class Myauthdbview(AuthDBView):
     login_template = "appbuilder/general/security/login_db.html"
-
     @expose("/login/api/", methods=["GET", "POST"])
     @pysnooper.snoop(watch_explode=('form',))
     def login_api(self):
@@ -231,9 +148,12 @@ class Myauthdbview(AuthDBView):
             from myapp.security import MyUserRemoteUserModelView_Base
             user_view = MyUserRemoteUserModelView_Base()
             user_view.post_add(user)
-            if not user.ls_token:
-                token = signup_labelStudio(user.email, password)
-                update_ls_token(self.appbuilder.sm, token,user)
+            from myapp import app
+            conf = app.config
+            ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://localhost:9002')
+            # 每次登录都重新获取ls_token值
+            token = signup_labelStudio(user.email, password, ls_domain= ls_domain)
+            update_ls_token(self.appbuilder.sm, token,user)
             return redirect(comed_url if comed_url else self.appbuilder.get_url_for_index)
         return self.render_template(
             self.login_template, title=self.title, form=form, appbuilder=self.appbuilder
@@ -241,8 +161,14 @@ class Myauthdbview(AuthDBView):
 
     @expose('/logout')
     def logout(self):
+        # label studio 退出登录
+        from myapp import app
+        conf = app.config
+        ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://localhost:9002')
+        logout_labelStudio(ls_domain)
         login_url = request.host_url.strip('/') + '/login/'
         session.pop('user', None)
         g.user = None
         logout_user()
+        
         return redirect(login_url)

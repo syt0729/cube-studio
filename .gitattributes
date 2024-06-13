@@ -1,0 +1,5 @@
+# Auto detect text files and normalize line endings
+* text=auto
+
+# Explicitly set file types
+*.py text eol=lf
