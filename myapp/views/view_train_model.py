@@ -2,6 +2,8 @@ from myapp.views.baseSQLA import MyappSQLAInterface as SQLAInterface
 from myapp.models.model_train_model import Training_Model
 from myapp.models.model_serving import InferenceService
 from myapp.security import MyUser
+from myapp.models.model_team import Project, Project_User
+from myapp.models.model_train_model import Training_Model
 from flask_babel import gettext as __
 from flask_babel import lazy_gettext as _
 from myapp import app, appbuilder, db
@@ -14,9 +16,10 @@ from flask_appbuilder.fieldwidgets import Select2Widget
 from myapp.forms import MyBS3TextFieldWidget
 from flask import (
     flash,
+    abort,
     g,
     redirect,
-    send_file, request, make_response, jsonify
+    send_file, send_from_directory, request, make_response, jsonify
 )
 from .base import (
     DeleteMixin,
@@ -184,14 +187,48 @@ triton-server：框架:地址。onnx:模型文件地址model.onnx，pytorch:torc
             return False
         return True
     
+    @expose('/dbtest/<params>', methods=['GET'])
+    @pysnooper.snoop()
+    def dbtest(self, params):
+        params = json.loads(params)
+        user_name = params['user_name']
+        model_name = params['model_name']
+        # model_name = '23'
+        # model_id = 5
+        project_name = 'public'
+        # user_name = 'admin'
+        model_list = {}
+
+        if not project_name:
+            abort(404)
+
+        user_id = db.session.query(MyUser).filter_by(username=user_name).first().id
+        project_id = db.session.query(Project).filter_by(name=project_name).first().id
+        if not db.session.query(Project_User).filter_by(project_id=project_id).first().user_id == user_id:
+            abort(401)
+        if model_name:
+            train_models = db.session.query(Training_Model).filter_by(name=model_name).all()
+        else:
+            train_models = db.session.query(Training_Model).filter_by(project=project_id).all()
+
+        if len(train_models) == 0:
+            _response = make_response('no model found')
+            _response.status_code = 404
+            return _response
+        for model in train_models:
+            id = model.id
+            version = model.version
+            model_list[id] = version
+        return json.dumps(model_list)
+
     # for api user
     @expose("/query/version/<model_name>", methods=["GET"])
     def query_model_version(self, model_name):
         request_headers = dict(request.headers)
         _response_401 = make_response('Authorization failed!')
         _response_401.status_code = 401
-        if not self.checkDownloadAuthorization(request_headers):
-            return _response_401
+        # if not self.checkDownloadAuthorization(request_headers):
+        #     return _response_401
 
         model_list = {}
         train_models = db.session.query(Training_Model).filter_by(name=model_name).all()
@@ -211,8 +248,8 @@ triton-server：框架:地址。onnx:模型文件地址model.onnx，pytorch:torc
         request_headers = dict(request.headers)
         _response_401 = make_response('Authorization failed!')
         _response_401.status_code = 401
-        if not self.checkDownloadAuthorization(request_headers):
-            return _response_401
+        # if not self.checkDownloadAuthorization(request_headers):
+        #     return _response_401
 
         train_model = db.session.query(Training_Model).filter_by(id=model_id).first()
         model_path = train_model.path
@@ -223,7 +260,7 @@ triton-server：框架:地址。onnx:模型文件地址model.onnx，pytorch:torc
         if not os.path.isfile(url):
             url = conf.get('MODEL_URLS', {}).get('train_model', '') # + '?filter=[{"key":"created_by","value":1}]'
             return redirect(url)
-        return send_file(url, as_attachment=True)
+        return send_from_directory(os.path.dirname(url), os.path.basename(url), as_attachment=True)
 
     #for browser user
     @expose("/download/browser/<model_id>", methods=["GET"])
@@ -240,7 +277,7 @@ triton-server：框架:地址。onnx:模型文件地址model.onnx，pytorch:torc
             url = conf.get('MODEL_URLS', {}).get('train_model', '') # + '?filter=[{"key":"created_by","value":1}]'
             return redirect(url)
         else:
-            return (send_file(url, as_attachment=True))
+            return send_from_directory(os.path.dirname(url), os.path.basename(url), as_attachment=True)
 
     @expose("/deploy/<model_id>", methods=["GET", 'POST'])
     def deploy(self, model_id):
