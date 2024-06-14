@@ -68,7 +68,7 @@ class Myapp(BaseMyappView):
 
     @expose('/menu')
     def menu(self):
-        ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://localhost:9002')
+        ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
         # 项目空间
         projetc = {
             "name": 'group',

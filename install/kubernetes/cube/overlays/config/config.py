@@ -86,6 +86,7 @@ AUTH_TYPE = AUTH_DB
 
 # label studio的ip 地址
 LABEL_STUDIO_IP = "http://192.168.1.249"
+LABEL_STUDIO_DOMAIN_NAME="http://192.168.1.249:9002"
 
 # AUTH_TYPE = AUTH_REMOTE_USER
 # Uncomment to setup Full admin role name

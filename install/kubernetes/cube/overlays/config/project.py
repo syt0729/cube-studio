@@ -150,7 +150,7 @@ class Myauthdbview(AuthDBView):
             user_view.post_add(user)
             from myapp import app
             conf = app.config
-            ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://localhost:9002')
+            ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
             # 每次登录都重新获取ls_token值
             token = signup_labelStudio(user.email, password, ls_domain= ls_domain)
             update_ls_token(self.appbuilder.sm, token,user)
@@ -164,7 +164,7 @@ class Myauthdbview(AuthDBView):
         # label studio 退出登录
         from myapp import app
         conf = app.config
-        ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://localhost:9002')
+        ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
         logout_labelStudio(ls_domain)
         login_url = request.host_url.strip('/') + '/login/'
         session.pop('user', None)
