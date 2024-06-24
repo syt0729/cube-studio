@@ -3,11 +3,10 @@ from flask_babel import gettext as __
 from flask_babel import lazy_gettext as _
 from myapp import app, appbuilder
 from myapp.models.log import Log
-from myapp.views.base import MyappModelView
 from . import LogMixin
+from flask_appbuilder.views import expose, ModelView
 
-
-class LogModelView(LogMixin, MyappModelView):
+class LogModelView(LogMixin, ModelView):
     datamodel = MyappSQLAInterface(Log)
     list_columns = ['user','method','path','duration_ms','dttm']
 
