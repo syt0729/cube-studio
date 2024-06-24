@@ -27,11 +27,49 @@ export default function TreePlus(props: IProps) {
 
 	const [relationDiagram, _setRelationDiagram] = useState<RelationDiagram>();
 	const relationDiagramRef = useRef(relationDiagram);
+	const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+	const fetchNodeDetail = (node: any) => {
+		setLoadingDetail(true);
+		getNodeInfoCommon(node?.detail_url || '').then(res => {
+			const detail = res.data.result.detail;
+			setNodeDetail(detail);
+			setLoadingDetail(false);
+		}).catch(() => {
+			setLoadingDetail(false);
+		});
+	};
+	
 	const setRelationDiagram = (data: RelationDiagram): void => {
 		relationDiagramRef.current = data;
 		_setRelationDiagram(data);
 	};
-
+	const startPolling = () => {
+		if (pollingIntervalRef.current) return;
+		pollingIntervalRef.current = setInterval(() => {
+			const currentNode = relationDiagramRef.current?.currentNode;
+			if (currentNode) {
+				fetchNodeDetail(currentNode);
+			}
+		}, 10000); // 每10秒获取一次数据
+	};	
+	
+	const stopPolling = () => {
+		if (pollingIntervalRef.current) {
+			clearInterval(pollingIntervalRef.current);
+			pollingIntervalRef.current = null;
+		}
+	};
+	
+	useEffect(() => {
+		if (visableDrawer) {
+			startPolling();
+		} else {
+			stopPolling();
+		}
+		return () => {
+			stopPolling();
+		};
+	}, [ visableDrawer]);
 	useEffect(() => {
 		const target = new RelationDiagram({
 			containerId: 'd3Container',
@@ -60,22 +98,15 @@ export default function TreePlus(props: IProps) {
 	}, [relationDiagram]);
 
 	const handleClickNode = (node: any) => {
-		console.log(node)
-		const currentNode = relationDiagram && relationDiagram.dataMap && relationDiagram.dataMap.get(node.key)
-		console.log('currentNode', currentNode);
-
-		setNodeDetail([])
-		setLoadingDetail(true)
-		setVisableDrawer(true)
-		getNodeInfoCommon(currentNode?.detail_url || '').then(res => {
-			console.log(res.data.result.detail);
-			const detail = res.data.result.detail
-			setNodeDetail(detail)
-			setLoadingDetail(false)
-		}).catch(() => {
-			setLoadingDetail(false)
-		})
-	}
+		const currentNode = relationDiagram && relationDiagram.dataMap && relationDiagram.dataMap.get(node.key);
+		if (relationDiagramRef.current) {  // 添加空值检查
+			relationDiagramRef.current.currentNode = currentNode; // 设置当前节点
+		}
+		setNodeDetail([]);
+		setLoadingDetail(true);
+		setVisableDrawer(true);
+		fetchNodeDetail(currentNode);
+	};	
 
 	const fetchBloodRelationData = (url: string) => {
 		if (relationDiagram) {

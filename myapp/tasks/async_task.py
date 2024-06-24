@@ -303,18 +303,20 @@ def update_dataset(task,dataset_id):
             elif dataset.download_url:
                 download_urls = dataset.download_url.split("\n")
                 for download_url in download_urls:
-                    try:
-                        import requests
-                        filename = download_url.split("/")[-1]
-                        try_num=0
-                        while try_num<3:
-                            try_num+=1
-                            response = requests.get(download_url)
-                            with open(remote_dir + '/' + filename, 'wb') as f:
-                                f.write(response.content)
-                                break
-                    except Exception as e:
-                        print(e)
+                    if os.path.exists(download_url):  # 处理本地文件路径
+                        if os.path.isfile(download_url):
+                            shutil.copy(download_url, remote_dir)
+                            logging.info(f'Copied local file {download_url} to {remote_dir}')
+                        elif os.path.isdir(download_url):
+                            # 复制目录下的所有文件
+                            for root, dirs, files in os.walk(download_url):
+                                for file in files:
+                                    file_path = os.path.join(root, file)
+                                    relative_path = os.path.relpath(file_path, download_url)
+                                    destination_path = os.path.join(remote_dir, relative_path)
+                                    os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+                                    shutil.copy(file_path, destination_path)
+                            logging.info(f'Copied local directory {download_url} to {remote_dir}')
 
         except Exception as e:
             logging.error(e)

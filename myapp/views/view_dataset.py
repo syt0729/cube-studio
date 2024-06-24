@@ -294,7 +294,7 @@ class Dataset_ModelView_base():
     def pre_delete(self, item):
         self.sync_label_studio(item, 'D')
 
-    #@pysnooper.snoop()
+    @pysnooper.snoop()
     def sync_label_studio(self, item, OpType = 'CR'):
             payload = {
                 'name': item.name,
@@ -316,7 +316,19 @@ class Dataset_ModelView_base():
                 'Authorization': ls_token
             }
             ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
-            requests.post(ls_domain+"/api/projects/sync-dataset", data=urlencode(payload), headers=headers)
+            response = requests.post(ls_domain+"/api/projects/sync-dataset", data=urlencode(payload), headers=headers)
+            rs = response.json()
+            download_url = rs.get('project_dir',None)
+            if download_url:
+                dataset = db.session.query(Dataset).filter_by(id=int(item.id)).first()
+                if dataset:
+                    # 更新 dodownload_url 字段
+                    dataset.download_url = download_url
+                
+                    # 提交更改
+                    db.session.commit()
+                else:
+                    print(f"No dataset found with id {item.id}")
 
     def pre_update(self, item):
         self.pre_add(item)
