@@ -72,6 +72,8 @@ from myapp import app, appbuilder, db, event_logger, cache
 from myapp.models.favorite import Favorite
 from myapp.security import MyUser
 from myapp.utils.core import get_valid_usernames
+from sqlalchemy.exc import SQLAlchemyError
+
 conf = app.config
 
 API_COLUMNS_INFO_RIS_KEY = 'columns_info'
@@ -373,7 +375,7 @@ class MyappModelRestApi(ModelRestApi):
 
     # 建构响应体
     @staticmethod
-    # @pysnooper.snoop(watch_explode='kwargs')
+    @pysnooper.snoop()
     def response(code, **kwargs):
         """
             Generic HTTP JSON response method
@@ -397,6 +399,10 @@ class MyappModelRestApi(ModelRestApi):
             flash_json.append([f[0], f[1]])
         resp.headers["api_flashes"] = json.dumps(flash_json)
         resp.headers["Content-Type"] = "application/json; charset=utf-8"
+        
+        # 记录调用堆栈
+        stack_trace = traceback.format_stack()
+        app.logger.info(f"Call stack for response: {stack_trace}")
         return resp
 
     # @pysnooper.snoop()
@@ -955,7 +961,7 @@ class MyappModelRestApi(ModelRestApi):
                 self.add_more_info(response, **kwargs)
             except Exception as e:
                 print(e)
-
+    @pysnooper.snoop()
     def response_error(self, code, message='error', status=1, result={}):
         back_data = {
             'result': result,
@@ -1371,7 +1377,7 @@ class MyappModelRestApi(ModelRestApi):
 
     @event_logger.log_this
     @expose("/<int:pk>", methods=["DELETE"])
-    # @pysnooper.snoop()
+    @pysnooper.snoop()
     def api_delete(self, pk):
         item = self.datamodel.get(pk, self._base_filters)
         if not item:
@@ -1424,6 +1430,7 @@ class MyappModelRestApi(ModelRestApi):
 
     @event_logger.log_this
     @expose("/multi_action/<string:name>", methods=["POST"])
+    @pysnooper.snoop()
     def multi_action(self, name):
         """
             Action method to handle multiple records selected from a list view
@@ -1435,13 +1442,18 @@ class MyappModelRestApi(ModelRestApi):
         ]
         try:
             back = action.func(items)
+            parsed = json.loads(back)
+            fail_data = parsed.get("fail")
             message = back if type(back) == str else 'success'
-            back = {
-                "status": 0,
-                "result": {},
-                "message": message
-            }
-            return self.response(200, **back)
+            if fail_data:
+                return self.response_error(422, message=message)
+            else:    
+                back = {
+                    "status": 0,
+                    "result": {},
+                    "message": message
+                }
+                return self.response(200, **back)
         except Exception as e:
             print(e)
             back = {
@@ -1665,21 +1677,29 @@ class MyappModelRestApi(ModelRestApi):
     #     return response
 
     @action("muldelete", "删除", "确定删除所选记录?", "fa-trash", single=False)
-    # @pysnooper.snoop(watch_explode=('items'))
+    @pysnooper.snoop()
     def muldelete(self, items):
         if not items:
             abort(404)
         success = []
         fail = []
-        for item in items:
-            try:
-                self.pre_delete(item)
-                db.session.delete(item)
-                success.append(item.to_json())
-            except Exception as e:
-                flash(str(e), "danger")
-                fail.append(item.to_json())
-        db.session.commit()
+        try:
+            for item in items:
+                try:
+                    self.pre_delete(item)
+                    db.session.delete(item)
+                    success.append(item.to_json())
+                except Exception as e:
+                    flash(str(e), "danger")
+                    fail.append(item.to_json())
+            db.session.commit()
+        except Exception as e:
+            # 捕获其他未预见的异常
+            db.session.rollback()
+            fail.append('error')
+            success = []
+        # finally:
+        #     db.session.remove()
         return json.dumps(
             {
                 "success": success,

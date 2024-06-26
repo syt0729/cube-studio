@@ -802,6 +802,9 @@ export default function TaskListManager(props?: IAppMenuItem) {
                                 resolve('');
                             })
                             .catch((err) => {
+                                if (err.response && err.response.status === 422) {
+                                    handleTips.trigger(`${labelTitle}存在被引用情况，不能${action.text}`)
+                                }
                                 reject();
                             });
                     })
