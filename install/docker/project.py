@@ -134,8 +134,12 @@ class Myauthdbview(AuthDBView):
             if not user:
                 user = self.appbuilder.sm.find_user(form.username.data)
                 if user:
-                    # 有用户，但是密码不对
-                    flash('发现用户%s已存在，但输入密码不对' % form.username.data, "warning")
+                    if not user.is_active:
+                        # 有用户，但是未激活
+                        flash('发现用户%s已存在，但账号未激活' % form.username.data, "warning")
+                    else:
+                        # 有用户，但是密码不对
+                        flash('发现用户%s已存在，但输入密码不对' % form.username.data, "warning")
 
                     return redirect(self.appbuilder.get_url_for_login)
                 else:
