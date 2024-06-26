@@ -16,6 +16,7 @@ import MixSearch, { IMixSearchParamItem } from '../components/MixSearch/MixSearc
 import DynamicForm, { calculateId, IDynamicFormConfigItem, IDynamicFormGroupConfigItem, ILinkageConfig } from '../components/DynamicForm/DynamicForm';
 import ChartOptionTempalte from './ChartOptionTempalte';
 import { useTranslation } from 'react-i18next';
+import { handleTips } from '../api';
 
 interface fatchDataParams {
     pageConf: TablePaginationConfig
@@ -439,7 +440,10 @@ export default function TaskListManager(props?: IAppMenuItem) {
                                                                 resolve('');
                                                             })
                                                             .catch((err) => {
-                                                                reject();
+                                                                if (err.response && err.response.status === 422) {
+                                                                    handleTips.trigger(`该${label_title}被引用，不能删除`)
+                                                                }
+                                                                reject(err)
                                                             });
                                                     })
                                                         .then((res) => {
@@ -451,7 +455,7 @@ export default function TaskListManager(props?: IAppMenuItem) {
                                                                 paramsMap: filters
                                                             });
                                                         })
-                                                        .catch(() => {
+                                                        .catch((err) => {
                                                             message.error(t('删除失败'));
                                                         });
                                                 },
