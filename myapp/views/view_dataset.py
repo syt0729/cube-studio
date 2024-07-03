@@ -143,7 +143,7 @@ class Dataset_ModelView_base():
 
     # class of ClassLabel
     "num_classes":3,
-    "names":['class1','class2','class3'] 
+    "names":['class1','class2','class3']
 
   },
 }
@@ -278,7 +278,7 @@ class Dataset_ModelView_base():
     import_data = True
     download_data = True
 
-    def pre_add(self, item):  
+    def pre_add(self, item):
         if not item.owner:
             item.owner = g.user.username + ",*"
         if not item.icon:
@@ -308,7 +308,7 @@ class Dataset_ModelView_base():
                     payload['owner'] = item.owner
             elif OpType == 'CR':
                 payload['owner'] = item.owner
-            
+
             ls_token = g.user.ls_token
             headers = {
                 'content-type':'application/x-www-form-urlencoded',
@@ -317,18 +317,19 @@ class Dataset_ModelView_base():
             }
             ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
             response = requests.post(ls_domain+"/api/projects/sync-dataset", data=urlencode(payload), headers=headers)
-            rs = response.json()
-            download_url = rs.get('project_dir',None)
-            if download_url:
-                dataset = db.session.query(Dataset).filter_by(id=int(item.id)).first()
-                if dataset:
-                    # 更新 dodownload_url 字段
-                    dataset.download_url = download_url
-                
-                    # 提交更改
-                    db.session.commit()
-                else:
-                    print(f"No dataset found with id {item.id}")
+            if OpType == "CR":
+                rs = response.json()
+                download_url = rs.get('project_dir',None)
+                if download_url:
+                    dataset = db.session.query(Dataset).filter_by(id=int(item.id)).first()
+                    if dataset:
+                        # 更新 dodownload_url 字段
+                        dataset.download_url = download_url
+
+                        # 提交更改
+                        db.session.commit()
+                    else:
+                        print(f"No dataset found with id {item.id}")
 
     def pre_update(self, item):
         self.pre_add(item)
