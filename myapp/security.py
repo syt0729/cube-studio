@@ -1,3 +1,4 @@
+from urllib.parse import urlencode
 from flask_login import current_user
 import logging
 import jwt
@@ -14,6 +15,7 @@ from flask_appbuilder.security.views import (
     RoleModelView,
     UserModelView
 )
+import requests
 from werkzeug.security import generate_password_hash,check_password_hash
 from flask_appbuilder.security.sqla.models import assoc_user_role
 
@@ -210,10 +212,30 @@ class MyUserRemoteUserModelView_Base():
             appbuilder=self.appbuilder,
         )
 
+    # label studio注册新用户，并获取用户token
+    @pysnooper.snoop(prefix="signup_labelStudio here.............: ")
+    def signup_labelStudio(self, email,password,ls_domain):
+        payload = {
+                'email':  email,
+                'password': password
+        }
+        headers = {
+            'content-type':'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+        }
+        response = requests.post(ls_domain+"/user/externalSignup/", data=urlencode(payload), headers=headers)
+        rs = response.json()
+        return rs.get('token',None)
+
+    def update_ls_token(self, token, user):
+        from myapp import security_manager
+        user.ls_token = "Token "+token
+        security_manager.update_user(user)
+
     # 添加默认gamma角色
-    # @pysnooper.snoop()
-    def post_add(self,user):
-        from myapp import security_manager,db
+    @pysnooper.snoop(watch=('user'))
+    def post_add(self,user, password=''):
+        from myapp import security_manager,db, app
         gamma_role = security_manager.find_role('Gamma')
         if gamma_role not in user.roles:
             user.roles.append(gamma_role)
@@ -232,6 +254,14 @@ class MyUserRemoteUserModelView_Base():
                 db.session.commit()
         except Exception:
             db.session.rollback()
+        conf = app.config
+        ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
+        # 每次登录都重新获取ls_token值
+        if not password=='':
+            token = self.signup_labelStudio(user.email, password, ls_domain)
+        else:
+            token = self.signup_labelStudio(user.email, user.password, ls_domain)
+        self.update_ls_token(token,user)
 
 
 class MyUserRemoteUserModelView(MyUserRemoteUserModelView_Base,UserModelView):
@@ -483,7 +513,7 @@ class MyappSecurityManager(SecurityManager):
         )
 
 
-    # @pysnooper.snoop()
+    #@pysnooper.snoop()
     def add_org_user(self,username,first_name,last_name,org,email,roles,password="",hashed_password=""):
         """
             Generic function to create user
@@ -527,7 +557,7 @@ class MyappSecurityManager(SecurityManager):
 
 
     # 添加注册远程用户
-    # @pysnooper.snoop()
+    #@pysnooper.snoop()
     def auth_user_remote_org_user(self, username,org_name='',password='',email='',first_name='',last_name=''):
         if not username:
             return None
@@ -573,7 +603,13 @@ class MyappSecurityManager(SecurityManager):
 
         return user
 
+    #@pysnooper.snoop()
+    def del_register_user(self, username, first_name, last_name, email, password="", hashed_password=""):
+        super().del_register_user(**kwargs)
 
+    #@pysnooper.snoop()
+    def add_user(self, username, first_name, last_name, email, role, password="", hashed_password=""):
+        super().add_user(**kwargs)
 
     READ_ONLY_MODEL_VIEWS = {
         'link','Minio','Kubernetes Dashboard','Granfana','Wiki'

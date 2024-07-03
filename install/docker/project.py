@@ -25,25 +25,6 @@ def push_message(receivers, message, link=None):
 class MyCustomRemoteUserView(AuthRemoteUserView):
     pass
 
-# label studio注册新用户，并获取用户token
-@pysnooper.snoop(prefix="signup_labelStudio here.............: ")
-def signup_labelStudio(email,password,ls_domain):
-    payload = {
-            'email':  email,
-            'password': password
-    }
-    headers = {
-        'content-type':'application/x-www-form-urlencoded',
-        'Accept': 'application/json',
-    }
-    response = requests.post(ls_domain+"/user/externalSignup/", data=urlencode(payload), headers=headers)
-    rs = response.json()
-    return rs.get('token',None)
-
-def update_ls_token(sm, token,user):
-    user.ls_token = "Token "+token
-    sm.update_user(user)
-
 def logout_labelStudio(ls_domain):
     ls_token = g.user.ls_token
     headers = {
@@ -51,7 +32,7 @@ def logout_labelStudio(ls_domain):
         'Accept': 'application/json',
         'Authorization': ls_token
     }
-    requests.post(ls_domain+"/user/external_logout/", headers=headers)    
+    requests.post(ls_domain+"/user/external_logout/", headers=headers)
 
 # 账号密码登录方式的登录界面
 class Myauthdbview(AuthDBView):
@@ -84,12 +65,12 @@ class Myauthdbview(AuthDBView):
                     "message": '未发现用户',
                     "result": {}
                 })
-   
-    @pysnooper.snoop(prefix="login here.............: ")
+
+    #@pysnooper.snoop(prefix="login here.............: ")
     @expose("/login/", methods=["GET", "POST"])
     def login(self):
         request_data = request.args.to_dict()
-        comed_url = request_data.get('login_url', '')      
+        comed_url = request_data.get('login_url', '')
         if 'rtx' in request_data:
             if request_data.get('rtx'):
                 username = request_data.get('rtx')
@@ -151,13 +132,7 @@ class Myauthdbview(AuthDBView):
             # 添加到public项目组
             from myapp.security import MyUserRemoteUserModelView_Base
             user_view = MyUserRemoteUserModelView_Base()
-            user_view.post_add(user)
-            from myapp import app
-            conf = app.config
-            ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
-            # 每次登录都重新获取ls_token值
-            token = signup_labelStudio(user.email, password, ls_domain= ls_domain)
-            update_ls_token(self.appbuilder.sm, token,user)
+            user_view.post_add(user, password)
             return redirect(comed_url if comed_url else self.appbuilder.get_url_for_index)
         return self.render_template(
             self.login_template, title=self.title, form=form, appbuilder=self.appbuilder
@@ -174,5 +149,5 @@ class Myauthdbview(AuthDBView):
         session.pop('user', None)
         g.user = None
         logout_user()
-        
+
         return redirect(login_url)
