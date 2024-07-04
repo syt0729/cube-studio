@@ -263,6 +263,19 @@ class MyUserRemoteUserModelView_Base():
             token = self.signup_labelStudio(user.email, user.password, ls_domain)
         self.update_ls_token(token,user)
 
+    @pysnooper.snoop(watch=('user'))
+    def post_delete(self,user):
+        from myapp import app
+        conf = app.config
+        ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
+        user.ls_token
+        headers = {
+            'content-type':'application/x-www-form-urlencoded',
+            'Accept': 'application/json',
+            'Authorization': g.user.ls_token
+        }
+        requests.delete(ls_domain+"/api/users/delete-by-email/?email="+user.email, headers=headers)
+
 
 class MyUserRemoteUserModelView(MyUserRemoteUserModelView_Base,UserModelView):
     datamodel = SQLAInterface(MyUser)
