@@ -37,7 +37,8 @@ device = select_device('cpu')
 # Load model
 model = attempt_load(model_path, map_location=device)  # load FP32 model
 stride = int(model.stride.max())  # model stride
-
+# 定义存放示例图片的本地目录
+local_examples_dir = "/yolov7/examples/"
 
 # @pysnooper.snoop()
 def inference(source):
@@ -121,14 +122,26 @@ def inference(source):
 
 label = 'cube-studio开源平台yolov7目标识别推理服务'
 describe = 'cube studio开源云原生一站式机器学习/深度学习AI平台，支持sso登录，多租户/多项目组，数据资产对接，notebook在线开发，拖拉拽任务流pipeline编排，多机多卡分布式算法训练，超参搜索，推理服务VGPU，多集群调度，边缘计算，serverless，标注平台，自动化标注，数据集管理，大模型一键微调，llmops，私有知识库，AI应用商店，支持模型一键开发/推理/微调，私有化部署，支持国产cpu/gpu/npu芯片，支持RDMA，支持pytorch/tf/mxnet/deepspeed/paddle/colossalai/horovod/spark/ray/volcano分布式'
-gradio_examples=[
-    "https://cube-studio.oss-cn-hangzhou.aliyuncs.com/pipeline/media-download/train2014/COCO_train2014_000000000597.jpg",
-    "https://cube-studio.oss-cn-hangzhou.aliyuncs.com/pipeline/media-download/train2014/COCO_train2014_000000000797.jpg",
-    "https://cube-studio.oss-cn-hangzhou.aliyuncs.com/pipeline/media-download/train2014/COCO_train2014_000000000897.jpg",
-    "https://cube-studio.oss-cn-hangzhou.aliyuncs.com/pipeline/media-download/train2014/COCO_train2014_000000001397.jpg",
-    "https://cube-studio.oss-cn-hangzhou.aliyuncs.com/pipeline/media-download/train2014/COCO_train2014_000000001497.jpg",
-    "https://cube-studio.oss-cn-hangzhou.aliyuncs.com/pipeline/media-download/train2014/COCO_train2014_000000001697.jpg"
-]
+# gradio_examples=[
+#     "https://cube-studio.oss-cn-hangzhou.aliyuncs.com/pipeline/media-download/train2014/COCO_train2014_000000000597.jpg",
+#     "https://cube-studio.oss-cn-hangzhou.aliyuncs.com/pipeline/media-download/train2014/COCO_train2014_000000000797.jpg",
+#     "https://cube-studio.oss-cn-hangzhou.aliyuncs.com/pipeline/media-download/train2014/COCO_train2014_000000000897.jpg",
+#     "https://cube-studio.oss-cn-hangzhou.aliyuncs.com/pipeline/media-download/train2014/COCO_train2014_000000001397.jpg",
+#     "https://cube-studio.oss-cn-hangzhou.aliyuncs.com/pipeline/media-download/train2014/COCO_train2014_000000001497.jpg",
+#     "https://cube-studio.oss-cn-hangzhou.aliyuncs.com/pipeline/media-download/train2014/COCO_train2014_000000001697.jpg"
+# ]
+
+# 创建一个函数来获取本地图片路径
+def get_local_examples():
+    examples = []
+    for file in os.listdir(local_examples_dir):
+        if file.endswith(('.jpg', '.jpeg', '.png')):  # 只包含图片文件
+            examples.append(os.path.join(local_examples_dir, file))
+    return examples
+
+# 使用本地图片路径
+gradio_examples = get_local_examples()
+
 with gr.Blocks(title=label,theme=gr.themes.Default(text_size='lg')) as demo:
 
     with gr.Row():
@@ -156,6 +169,10 @@ with gr.Blocks(title=label,theme=gr.themes.Default(text_size='lg')) as demo:
                     fn=inference,
                     cache_examples=False,
                 )
+
+
+
+
             # with gr.Row():
             #     path = os.path.join(current_dir,'gradio_rec.txt')
             #     if os.path.exists(path):

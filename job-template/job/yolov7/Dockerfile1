@@ -1,0 +1,7 @@
+FROM bxg-yolov7-service-deploy:20240708
+
+
+RUN chmod 777 launcher.sh
+ENTRYPOINT ["bash","launcher.sh"]
+
+
