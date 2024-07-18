@@ -3,10 +3,12 @@ import re
 import shutil
 from urllib.parse import urlencode
 from flask_appbuilder import action
+from myapp.models.model_team import Project, Project_User
 from myapp.views.baseSQLA import MyappSQLAInterface as SQLAInterface
 from wtforms.validators import DataRequired, Regexp
 from myapp import app, appbuilder
 from wtforms import StringField, SelectField
+from wtforms.ext.sqlalchemy.fields import QuerySelectField
 from flask_appbuilder.fieldwidgets import BS3TextFieldWidget, Select2Widget, Select2ManyWidget
 from myapp.forms import MyBS3TextAreaFieldWidget, MySelect2Widget, MyCommaSeparatedListField, MySelect2ManyWidget, \
     MySelectMultipleField
@@ -17,9 +19,11 @@ import json, os, sys
 from werkzeug.utils import secure_filename
 import pysnooper
 from sqlalchemy import or_
+from sqlalchemy.orm import aliased
 from flask_babel import gettext as __
 from flask_babel import lazy_gettext as _
 import importlib
+from myapp.security import MyUser
 from .base import (
     DeleteMixin,
     MyappFilter,
@@ -40,10 +44,18 @@ class Dataset_Filter(MyappFilter):
         if "admin" in user_roles:
             return query
 
+        # 当前用户 ID
+        user_id = g.user.id
+
+        # 获取与当前用户相关的项目 ID 列表
+        related_project_ids = db.session.query(Project.id).join(Project_User).filter(Project_User.user_id == user_id).all()
+        related_project_ids = [pid[0] for pid in related_project_ids]
+
         return query.filter(
             or_(
                 self.model.owner.contains(g.user.username),
-                self.model.owner.contains('*')
+                self.model.owner.contains('*'),
+                self.model.project_id.in_(related_project_ids)
             )
         )
 
@@ -59,10 +71,10 @@ class Dataset_ModelView_base():
 
     add_columns = ['name', 'version', 'label', 'describe', 'source_type', 'source', 'field',
                    'usage', 'storage_class', 'file_type', 'url', 'download_url', 'path',
-                   'storage_size', 'entries_num', 'duration', 'price', 'status', 'icon', 'owner', 'features']
+                   'storage_size', 'entries_num', 'duration', 'price', 'status', 'icon','project', 'owner', 'features']
     show_columns = ['id', 'name', 'version', 'label', 'describe', 'segment', 'source_type', 'source',
                     'industry', 'field', 'usage', 'storage_class', 'file_type', 'status', 'url',
-                    'path', 'download_url', 'storage_size', 'entries_num', 'duration', 'price', 'status', 'icon',
+                    'path', 'download_url', 'storage_size', 'entries_num', 'duration', 'price', 'status', 'icon','project',
                     'owner', 'features']
     search_columns = ['name', 'version', 'label', 'describe', 'source_type', 'source', 'field', 'usage','storage_class', 'file_type', 'status', 'url', 'path', 'download_url']
     spec_label_columns = {
@@ -88,7 +100,7 @@ class Dataset_ModelView_base():
     }
 
     edit_columns = add_columns
-    list_columns = ['icon_html', 'name', 'version', 'label', 'describe','owner', 'source_type', 'source', 'status',
+    list_columns = ['icon_html', 'name', 'version', 'label', 'describe','project','owner', 'source_type', 'source', 'status',
                     'field', 'url_html', 'download_url_html', 'usage', 'storage_class', 'file_type', 'path_html', 'storage_size', 'entries_num', 'price']
 
     cols_width = {
@@ -106,6 +118,7 @@ class Dataset_ModelView_base():
         "storage_class": {"type": "ellip1", "width": 100},
         "storage_size": {"type": "ellip1", "width": 100},
         "file_type": {"type": "ellip1", "width": 100},
+        "project_id": {"type": "ellip1", "width": 200},
         "owner": {"type": "ellip1", "width": 200},
         "status": {"type": "ellip1", "width": 100},
         "entries_num": {"type": "ellip1", "width": 200},
@@ -235,6 +248,13 @@ class Dataset_ModelView_base():
             description='',
             widget=BS3TextFieldWidget(),
         ),
+        "project": QuerySelectField(
+            _('项目组'),
+            query_factory=lambda: db.session.query(Project),
+            allow_blank=True,
+            widget=Select2Widget(extra_classes="readonly"),
+            description= _('只有creator可以添加修改组成员，可以添加多个creator')
+        ),
         "owner": StringField(
             label= _('责任人'),
             default='*',
@@ -295,6 +315,19 @@ class Dataset_ModelView_base():
         self.sync_label_studio(item, 'D')
 
     @pysnooper.snoop()
+    def _merge_project_users(self, item):
+        if item.owner == '*':
+            return item.owner
+        if item.project.id:
+            project_users = db.session.query(MyUser.username).join(Project_User, Project_User.user_id == MyUser.id).filter(Project_User.project_id == item.project.id).all()
+            project_usernames = [user.username for user in project_users]
+            # 将 owner 和 project_usernames 合并并去重
+            owner_usernames = set(item.owner.split(','))
+            combined_usernames = owner_usernames.union(project_usernames)
+            full_owner = ",".join(combined_usernames)
+            return full_owner
+
+    @pysnooper.snoop()
     def sync_label_studio(self, item, OpType = 'CR'):
             payload = {
                 'name': item.name,
@@ -304,10 +337,13 @@ class Dataset_ModelView_base():
             }
             if OpType == "M":
                 owner = self.src_item_json.get('owner')
-                if not owner == item.owner:
-                    payload['owner'] = item.owner
+                project_id = self.src_item_json.get('project_id')
+                if owner != item.owner or project_id != item.project.id:
+                    payload['owner'] = self._merge_project_users(item)
+                    print(item.project.id)
+                    print(item.owner)
             elif OpType == 'CR':
-                payload['owner'] = item.owner
+                payload['owner'] = self._merge_project_users(item)
 
             ls_token = g.user.ls_token
             headers = {

@@ -6,9 +6,11 @@ from sqlalchemy import Text
 import os,time,json
 from myapp.models.helpers import AuditMixinNullable
 from myapp import app
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String,ForeignKey
+from sqlalchemy.orm import backref, relationship
 from flask import Markup,request,g
 from myapp.models.base import MyappModelBase
+
 metadata = Model.metadata
 conf = app.config
 
@@ -54,7 +56,8 @@ class Dataset(Model,AuditMixinNullable,MyappModelBase):
     metric_info = Column(Text, nullable=True,default='{}',comment='数据集，指标信息')  #
 
     owner = Column(String(200),nullable=True,default='*',comment='责任人，*表示全部可见')  #
-
+    project_id = Column(Integer, ForeignKey("project.id"),nullable=True,comment='项目组id')
+    project = relationship('Project', backref='datasets')
     expand = Column(Text(65536), nullable=True,default='{}',comment='扩展参数')
 
     def __repr__(self):
