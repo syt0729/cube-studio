@@ -86,7 +86,7 @@ const AppWrapper = (props: IProps) => {
 
     getAppHeaderConfig().then(res => {
       const config = res.data
-      //setHeaderConfig(config)
+      setHeaderConfig(config)
     }).catch(err => { })
   }, [])
 

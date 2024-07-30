@@ -212,7 +212,7 @@ export const formatRoute = (data: IAppMenuItem[]): IRouterConfigPlusItem[] => {
     return resData
 }
 
-const whiteList = ['标注平台','任务实例']
+const whiteList = ['标注平台','任务实例','数据智能','聊天']
 const blackList = ['数据探索', '元数据']
 export const customizeRoute = (data: IAppMenuItem[]):IAppMenuItem[] => {
     const customized:IAppMenuItem[] = []
@@ -223,11 +223,11 @@ export const customizeRoute = (data: IAppMenuItem[]):IAppMenuItem[] => {
             if(item.children?.length){
                 item.children = customizeRoute([...item.children])
             }
-            if(item.isMenu){     
+            if(item.isMenu){
                 item.children?.length && customized.push(item)
             } else{
                 customized.push(item)
-            } 
+            }
         }
     }
     return customized
