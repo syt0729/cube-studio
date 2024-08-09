@@ -82,20 +82,20 @@ class InferenceService_ModelView_base():
     }
     edit_form_query_rel_fields = add_form_query_rel_fields
 
-    list_columns = ['project', 'service_type', 'label', 'model_name_url', 'model_version', 'inference_host_url', 'ip',
-                    'model_status', 'resource', 'replicas_html', 'creator', 'modified', 'operate_html']
+    list_columns = ['project', 'label', 'model_name_url', 'model_version',  'ip',
+                    'model_status', 'creator', 'modified', 'service_type', 'resource', 'replicas_html', 'operate_html']
     cols_width = {
-        "project": {"type": "ellip2", "width": 150},
-        "label": {"type": "ellip2", "width": 300},
-        "service_type": {"type": "ellip2", "width": 100},
-        "model_name_url": {"type": "ellip2", "width": 300},
-        "model_version": {"type": "ellip2", "width": 200},
+        "project": {"type": "ellip2", "width": 120},
+        "label": {"type": "ellip2", "width": 200},
+        "service_type": {"type": "ellip2", "width": 120},
+        "model_name_url": {"type": "ellip2", "width": 200},
+        "model_version": {"type": "ellip2", "width": 180},
         "inference_host_url": {"type": "ellip1", "width": 500},
-        "ip": {"type": "ellip2", "width": 250},
+        "ip": {"type": "ellip2", "width": 200},
         "model_status": {"type": "ellip2", "width": 100},
         "modified": {"type": "ellip2", "width": 150},
         "operate_html": {"type": "ellip2", "width": 350},
-        "resource": {"type": "ellip2", "width": 300},
+        "resource": {"type": "ellip2", "width": 200},
     }
     search_columns = ['name', 'created_by', 'project', 'service_type', 'label', 'model_name', 'model_version',
                       'model_path', 'host', 'model_status', 'resource_gpu']

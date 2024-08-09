@@ -52,8 +52,8 @@ class Training_Model_ModelView_Base():
     base_permissions = ['can_add', 'can_edit', 'can_delete', 'can_list', 'can_show']
     base_order = ('changed_on', 'desc')
     order_columns = ['id']
-    list_columns = ['project_url', 'name', 'version', 'model_metric', 'framework', 'api_type', 'pipeline_url',
-                    'creator', 'modified', 'deploy', 'download']
+    list_columns = ['project_url', 'name', 'version',  'pipeline_url',
+                    'creator', 'modified', 'deploy', 'download', 'model_metric', 'framework', 'api_type']
     search_columns = ['created_by', 'project', 'name', 'version', 'framework', 'api_type', 'pipeline_id', 'run_id',
                       'path']
     add_columns = ['project', 'name', 'version', 'describe', 'path', 'framework', 'run_id', 'run_time', 'metrics',
@@ -65,14 +65,14 @@ class Training_Model_ModelView_Base():
     }
     edit_form_query_rel_fields = add_form_query_rel_fields
     cols_width = {
-        "name": {"type": "ellip2", "width": 250},
-        "project_url": {"type": "ellip2", "width": 200},
-        "pipeline_url": {"type": "ellip2", "width": 300},
+        "name": {"type": "ellip2", "width": 230},
+        "project_url": {"type": "ellip2", "width": 250},
+        "pipeline_url": {"type": "ellip2", "width": 230},
         "version": {"type": "ellip2", "width": 200},
         "modified": {"type": "ellip2", "width": 150},
         "deploy": {"type": "ellip2", "width": 100},
         "donwload": {"type": "ellip2", "width": 100},
-        "model_metric": {"type": "ellip2", "width": 300},
+        "model_metric": {"type": "ellip2", "width": 200},
     }
     spec_label_columns = {
         "path": _("模型文件"),
@@ -272,8 +272,14 @@ triton-server：框架:地址。onnx:模型文件地址model.onnx，pytorch:torc
         url = dir_prefix
         if model_path.startswith('/mnt'):
             url = os.path.join(dir_prefix, model_path.strip('/mnt'))
+        elif model_path.startswith('http'):
+            url = model_path
         if not os.path.isfile(url):
-            flash(__('model not exist'), 'error')
+            if url.startswith('https://') or url.startswith('http://'):
+                # flash(__('This is a online model, please download from ' + url), 'info')
+                return redirect(url)
+            else:
+                flash(__('model not exist'), 'error')
             url = conf.get('MODEL_URLS', {}).get('train_model', '') # + '?filter=[{"key":"created_by","value":1}]'
             return redirect(url)
         else:
