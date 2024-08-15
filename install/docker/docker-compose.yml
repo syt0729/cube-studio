@@ -48,6 +48,7 @@ services:
       REDIS_PASSWORD: admin
       MYSQL_SERVICE: 'mysql+pymysql://root:admin@host.docker.internal:3306/kubeflow?charset=utf8'
       # MYSQL_SERVICE: 'mysql+pymysql://root:admin@192.168.1.65:3306/kubeflow?charset=utf8'
+      # MYSQL_SERVICE: 'mysql+pymysql://root:admin@10.43.7.246:3306/kubeflow?charset=utf8'
       ENVIRONMENT: DEV
     depends_on:
       - redis
