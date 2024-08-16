@@ -3,7 +3,10 @@
 
 ##  卸载旧版本docker
 ```bash
-apt-get remove docker docker-engine docker-ce docker.io docker-ce docker-ce-cli docker-compose
+sudo systemctl stop docker
+apt-get --purge remove -y *docker*  
+sudo apt-get autoremove -y
+dpkg -l | grep docker
 ```
 
 ## 安装docker
@@ -17,10 +20,11 @@ sudo apt-get install -y ca-certificates curl gnupg lsb-release vim git wget net-
 
 sudo mkdir -p /etc/apt/keyrings
 rm -rf /etc/apt/keyrings/docker.gpg
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+rm -rf /etc/apt/sources.list.d/docker.list
 
-### 稳定存储库
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+### 国内使用阿里源
+curl -fsSL http://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg | apt-key add -
+sudo add-apt-repository "deb [arch=amd64] http://mirrors.aliyun.com/docker-ce/linux/ubuntu $(lsb_release -cs) stable"
 
 ### 安装docker
 sudo apt-get update
@@ -30,7 +34,9 @@ sudo apt-get update
 # 搜索可用版本
 apt-cache madison docker-ce
 # 安装指定版本，使用安装指定版本
-apt install -y docker-ce=5:20.10.24~3-0~ubuntu-focal
+apt install -y docker-ce=5:27.0.3-1~ubuntu.20.04~focal      # ubuntu 2020
+apt install -y docker-ce=5:27.0.3-1~ubuntu.22.04~jammy      # ubuntu 2022
+apt install -y docker-ce=5:27.0.3-1~ubuntu.24.04~noble      # ubuntu 2024
 
 # 安装最新版(最好使用指定版本)
 # sudo apt install -y docker-ce docker-compose
@@ -71,29 +77,55 @@ rpm -qa | grep docker | xargs yum remove -y
 rpm -qa | grep docker
 rm -rf /usr/lib/systemd/system/docker.service
 
+# 安装镜像源
+yum install -y container-selinux  yum-utils 
 
-yum install -y yum-utils
-yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
 yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo 
 
 yum update -y
 # 查看可用版本
 yum list docker-ce --showduplicates
-# 安装20.x的版本
-yum install -y docker-ce-3:20.10.24-3.el8
+# 安装指定版本，使用安装指定版本
+yum install -y docker-ce
+#yum install -y docker-ce-3:26.1.3-1.el8
+#yum install -y docker-ce-3:26.1.3-1.el9
 
 systemctl start docker
 
 ```
 
-替换国内的docker源
-vi /etc/docker/daemon.json
+# 配置docker
+
 ```bash
+vi /etc/docker/daemon.json
+
+添加如下配置
+
 {
-	"registry-mirrors": ["https://registry.docker-cn.com","https://pee6w651.mirror.aliyuncs.com"]
+    "registry-mirrors": ["https://hub.uuuadc.top", "https://docker.anyhub.us.kg", "https://dockerhub.jobcher.com", "https://dockerhub.icu", "https://docker.ckyl.me", "https://docker.awsl9527.cn"],
+    "dns": ["114.114.114.114","8.8.8.8"],
+    "data-root": "/data/docker",
+    "insecure-registries":["docker.oa.com:8080"]
 }
+
+systemctl stop docker
+systemctl daemon-reload
+systemctl start docker
 ```
 
+# 切换docker根目录
+
+```bash
+mkdir -p /data/docker/
+# 将源docker目录下文件，复制到新目录下
+cp -R /var/lib/docker/* /data/docker/
+```
+然后按照上面的配置daemon.json，配置根目录为/data/docker/
+
+就可以把之前的目录删掉了
+```bash
+rm -rf /var/lib/docker
+```
 
 ## yum安装k8s的源
 ```bash

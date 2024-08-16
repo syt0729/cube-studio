@@ -127,9 +127,10 @@ def make_workflow_yaml(pipeline,workflow_label,hubsecret_list,dag_templates,cont
 # 转化为worfklow的yaml
 # @pysnooper.snoop()
 def dag_to_pipeline(pipeline, dbsession, workflow_label=None, **kwargs):
-    pipeline.dag_json = pipeline.fix_dag_json(dbsession)
+    dag_json = pipeline.fix_dag_json(dbsession)
+    pipeline.dag_json=dag_json
     dbsession.commit()
-    dag = json.loads(pipeline.dag_json)
+    dag = json.loads(dag_json)
 
     # 如果dag为空，就直接退出
     if not dag:
@@ -692,40 +693,43 @@ class Pipeline_ModelView_Base():
     related_views = [Task_ModelView, ]
 
     def delete_task_run(self, task):
-        from myapp.utils.py.py_k8s import K8s
-        k8s_client = K8s(task.pipeline.project.cluster.get('KUBECONFIG', ''))
-        namespace = task.pipeline.namespace
-        # 删除运行时容器
-        pod_name = "run-" + task.pipeline.name.replace('_', '-') + "-" + task.name.replace('_', '-')
-        pod_name = pod_name.lower()[:60].strip('-')
-        pod = k8s_client.get_pods(namespace=namespace, pod_name=pod_name)
-        # print(pod)
-        if pod:
-            pod = pod[0]
-        # 有历史，直接删除
-        if pod:
-            k8s_client.delete_pods(namespace=namespace, pod_name=pod['name'])
-            run_id = pod['labels'].get('run-id', '')
-            if run_id:
-                k8s_client.delete_workflow(all_crd_info=conf.get("CRD_INFO", {}), namespace=namespace, run_id=run_id)
-                k8s_client.delete_pods(namespace=namespace, labels={"run-id": run_id})
-                time.sleep(2)
+        try:
+            from myapp.utils.py.py_k8s import K8s
+            k8s_client = K8s(task.pipeline.project.cluster.get('KUBECONFIG', ''))
+            namespace = task.pipeline.namespace
+            # 删除运行时容器
+            pod_name = "run-" + task.pipeline.name.replace('_', '-') + "-" + task.name.replace('_', '-')
+            pod_name = pod_name.lower()[:60].strip('-')
+            pod = k8s_client.get_pods(namespace=namespace, pod_name=pod_name)
+            # print(pod)
+            if pod:
+                pod = pod[0]
+            # 有历史，直接删除
+            if pod:
+                k8s_client.delete_pods(namespace=namespace, pod_name=pod['name'])
+                run_id = pod['labels'].get('run-id', '')
+                if run_id:
+                    k8s_client.delete_workflow(all_crd_info=conf.get("CRD_INFO", {}), namespace=namespace, run_id=run_id)
+                    k8s_client.delete_pods(namespace=namespace, labels={"run-id": run_id})
+                    time.sleep(2)
 
-        # 删除debug容器
-        pod_name = "debug-" + task.pipeline.name.replace('_', '-') + "-" + task.name.replace('_', '-')
-        pod_name = pod_name.lower()[:60].strip('-')
-        pod = k8s_client.get_pods(namespace=namespace, pod_name=pod_name)
-        # print(pod)
-        if pod:
-            pod = pod[0]
-        # 有历史，直接删除
-        if pod:
-            k8s_client.delete_pods(namespace=namespace, pod_name=pod['name'])
-            run_id = pod['labels'].get('run-id', '')
-            if run_id:
-                k8s_client.delete_workflow(all_crd_info=conf.get("CRD_INFO", {}), namespace=namespace, run_id=run_id)
-                k8s_client.delete_pods(namespace=namespace, labels={"run-id": run_id})
-                time.sleep(2)
+            # 删除debug容器
+            pod_name = "debug-" + task.pipeline.name.replace('_', '-') + "-" + task.name.replace('_', '-')
+            pod_name = pod_name.lower()[:60].strip('-')
+            pod = k8s_client.get_pods(namespace=namespace, pod_name=pod_name)
+            # print(pod)
+            if pod:
+                pod = pod[0]
+            # 有历史，直接删除
+            if pod:
+                k8s_client.delete_pods(namespace=namespace, pod_name=pod['name'])
+                run_id = pod['labels'].get('run-id', '')
+                if run_id:
+                    k8s_client.delete_workflow(all_crd_info=conf.get("CRD_INFO", {}), namespace=namespace, run_id=run_id)
+                    k8s_client.delete_pods(namespace=namespace, labels={"run-id": run_id})
+                    time.sleep(2)
+        except Exception as e:
+            print(e)
 
     # 检测是否具有编辑权限，只有creator和admin可以编辑
     def check_edit_permission(self, item):
@@ -900,6 +904,7 @@ class Pipeline_ModelView_Base():
     # 删除前先把下面的task删除了，把里面的运行实例也删除了，把定时调度删除了
     # @pysnooper.snoop()
     def pre_delete(self, pipeline):
+
         db.session.commit()
         if __("(废弃)") not in pipeline.describe:
             pipeline.describe += __("(废弃)")
@@ -921,8 +926,12 @@ class Pipeline_ModelView_Base():
             db.session.delete(task)
 
         # 删除所有的workflow
-        db.session.query(Workflow).filter_by(foreign_key=str(pipeline.id)).delete()
-        db.session.query(RunHistory).filter_by(pipeline_id=pipeline.id).delete()
+        # 只是删除了数据库记录，但是实例并没有删除，会重新监听更新的。
+        db.session.query(Workflow).filter_by(foreign_key=str(pipeline.id)).delete(synchronize_session=False)
+        db.session.commit()
+        db.session.query(Workflow).filter(Workflow.labels.contains(f'"pipeline-id": "{str(pipeline.id)}"')).delete(synchronize_session=False)
+        db.session.commit()
+        db.session.query(RunHistory).filter_by(pipeline_id=pipeline.id).delete(synchronize_session=False)
         db.session.commit()
 
 
@@ -1020,6 +1029,10 @@ class Pipeline_ModelView_Base():
                         username = labels['run-rtx']
                     elif 'pipeline-rtx' in labels:
                         username = labels['pipeline-rtx']
+                    elif 'run-username' in labels:
+                        username = labels['run-username']
+                    elif 'pipeline-username' in labels:
+                        username = labels['pipeline-username']
 
                     workflow = Workflow(name=crd['name'], namespace=crd['namespace'], create_time=crd['create_time'],
                                         cluster=labels.get("cluster", ''),
@@ -1038,8 +1051,9 @@ class Pipeline_ModelView_Base():
     # @event_logger.log_this
     @expose("/run_pipeline/<pipeline_id>", methods=["GET", "POST"])
     @check_pipeline_perms
+    # @pysnooper.snoop()
     def run_pipeline(self, pipeline_id):
-        print(pipeline_id)
+        # print(pipeline_id)
         pipeline = db.session.query(Pipeline).filter_by(id=pipeline_id).first()
         pipeline.delete_old_task()
         tasks = db.session.query(Task).filter_by(pipeline_id=pipeline_id).all()
@@ -1067,6 +1081,10 @@ class Pipeline_ModelView_Base():
         # return
         print('begin upload and run pipeline %s' % pipeline.name)
         pipeline.version_id = ''
+        if not pipeline.pipeline_file:
+            flash("请先编排任务，并进行保存后再运行整个任务流",'warning')
+            return redirect('/pipeline_modelview/api/web/%s' % pipeline.id)
+
         crd_name = run_pipeline(pipeline, json.loads(pipeline.pipeline_file))  # 会根据版本号是否为空决定是否上传
         pipeline.pipeline_argo_id = crd_name
         db.session.commit()  # 更新
@@ -1104,7 +1122,7 @@ class Pipeline_ModelView_Base():
         #         print(e)
 
         db.session.commit()
-        print(pipeline_id)
+        # print(pipeline_id)
         url = '/static/appbuilder/vison/index.html?pipeline_id=%s' % pipeline_id  # 前后端集成完毕，这里需要修改掉
         return redirect('/frontend/showOutLink?url=%s' % urllib.parse.quote(url, safe=""))
         # 返回模板
@@ -1124,12 +1142,12 @@ class Pipeline_ModelView_Base():
     @expose("/web/monitoring/<pipeline_id>", methods=["GET"])
     def web_monitoring(self, pipeline_id):
         pipeline = db.session.query(Pipeline).filter_by(id=int(pipeline_id)).first()
-        if pipeline.run_id:
-            url = "http://"+pipeline.project.cluster.get('HOST', request.host)+conf.get('GRAFANA_TASK_PATH')+ pipeline.name
-            return redirect(url)
-        else:
-            flash('no running instance', 'warning')
-            return redirect('/pipeline_modelview/api/web/%s' % pipeline.id)
+
+        url = "http://"+pipeline.project.cluster.get('HOST', request.host)+conf.get('GRAFANA_TASK_PATH')+ pipeline.name
+        return redirect(url)
+        # else:
+        #     flash('no running instance', 'warning')
+        #     return redirect('/pipeline_modelview/api/web/%s' % pipeline.id)
 
     # # @event_logger.log_this
     @expose("/web/pod/<pipeline_id>", methods=["GET"])
@@ -1152,13 +1170,13 @@ class Pipeline_ModelView_Base():
     @expose("/web/runhistory/<pipeline_id>", methods=["GET"])
     def web_runhistory(self,pipeline_id):
         url = conf.get('MODEL_URLS', {}).get('runhistory', '') + '?filter=' + urllib.parse.quote(json.dumps([{"key": "pipeline", "value": int(pipeline_id)}], ensure_ascii=False))
-        print(url)
+        # print(url)
         return redirect(url)
 
     @expose("/web/workflow/<pipeline_id>", methods=["GET"])
     def web_workflow(self,pipeline_id):
         url = conf.get('MODEL_URLS', {}).get('workflow', '') + '?filter=' + urllib.parse.quote(json.dumps([{"key": "labels", "value": '"pipeline-id": "%s"'%pipeline_id}], ensure_ascii=False))
-        print(url)
+        # print(url)
         return redirect(url)
 
 
@@ -1197,13 +1215,14 @@ class Pipeline_ModelView_Base():
             change_node(task.id, new_task.id)
 
         new_pipeline.expand = json.dumps(expand)
+        new_pipeline.parameter="{}" # 扩展参数不进行复制，这样demo的pipeline不会被复制一遍
         db.session.commit()
         return new_pipeline
 
     # # @event_logger.log_this
     @expose("/copy_pipeline/<pipeline_id>", methods=["GET", "POST"])
     def copy_pipeline(self, pipeline_id):
-        print(pipeline_id)
+        # print(pipeline_id)
         message = ''
         try:
             pipeline = db.session.query(Pipeline).filter_by(id=pipeline_id).first()

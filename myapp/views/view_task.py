@@ -110,7 +110,7 @@ class Task_ModelView_Base():
         ),
         "volume_mount": StringField(
             label= _('挂载'),
-            description= _('外部挂载，格式:$pvc_name1(pvc):/$container_path1,$hostpath1(hostpath):/$container_path2,4G(memory):/dev/shm,注意pvc会自动挂载对应目录下的个人rtx子目录'),
+            description= _('外部挂载，格式:$pvc_name1(pvc):/$container_path1,$hostpath1(hostpath):/$container_path2,4G(memory):/dev/shm,注意pvc会自动挂载对应目录下的个人username子目录'),
             widget=BS3TextFieldWidget(),
             default='kubeflow-user-workspace(pvc):/mnt,kubeflow-archives(pvc):/archives'
         ),
@@ -169,7 +169,7 @@ class Task_ModelView_Base():
         ),
     }
 
-    add_form_extra_fields['resource_gpu'] = StringField('gpu', default='0', description= _('gpu的资源使用限制(单位卡)，示例:1，2，训练任务每个容器独占整卡。申请具体的卡型号，可以类似 1(V100)，目前支持T4/V100/A100/VGPU'),widget=BS3TextFieldWidget())
+    add_form_extra_fields['resource_gpu'] = StringField('gpu', default='0', description= _('gpu的资源使用限制(单位卡)，示例:1，2，训练任务每个容器独占整卡。申请具体的卡型号，可以类似 1(V100)'),widget=BS3TextFieldWidget())
     add_form_extra_fields['resource_rdma'] = StringField('rdma', default='0', description= _('RDMA的资源使用限制，示例 0，1，10，填写方式咨询管理员'), widget=BS3TextFieldWidget())
 
     edit_form_extra_fields = add_form_extra_fields
@@ -451,9 +451,7 @@ class Task_ModelView_Base():
         # 将哈希值映射到指定范围
         hostPort = 40000 + 10*(hash_value % 1000)
 
-        if HostNetwork:
-            task_env += 'PORT1=' + str(hostPort + 1)+ "\n"
-            task_env += 'PORT2=' + str(hostPort + 2)+ "\n"
+
 
         _, _, resource_name = core.get_gpu(task.resource_gpu)
 
@@ -536,6 +534,7 @@ class Task_ModelView_Base():
         k8s_client.create_debug_pod(namespace,
                                     name=pod_name,
                                     labels={"pipeline": task.pipeline.name, 'task': task.name, 'user': g.user.username, 'run-id': run_id, 'pod-type': "task"},
+                                    annotations={'project':task.pipeline.project.name},
                                     command=command,
                                     args=new_args,
                                     volume_mount=volume_mount,
@@ -562,7 +561,7 @@ class Task_ModelView_Base():
 
         # 逻辑节点不能进行调试
         if task.job_template.name == conf.get('LOGICAL_JOB'):
-            message = _('当前任务类型不允许进行调试')
+            message = __('当前任务类型不允许进行调试')
             flash(message, 'warning')
             return self.response(400, **{"status": 1, "result": {}, "message": message})
 
@@ -570,7 +569,7 @@ class Task_ModelView_Base():
         if task.job_template.name != conf.get('CUSTOMIZE_JOB'):
             # 模板创建者可以调试模板
             if not g.user.is_admin() and task.job_template.created_by.username != g.user.username:
-                message = _('仅管理员或当前任务模板创建者，可启动debug模式')
+                message = __('仅管理员或当前任务模板创建者，可启动debug模式')
                 flash(message, 'warning')
                 return self.response(400, **{"status": 1, "result": {}, "message": message})
 
@@ -603,6 +602,13 @@ class Task_ModelView_Base():
             image = json.loads(task.args)['--image']
         if json.loads(task.args).get('images',''):
             image = json.loads(task.args)['images']
+        working_dir = None
+        if json.loads(task.args).get('workdir', ''):
+            working_dir = json.loads(task.args)['workdir']
+        if json.loads(task.args).get('--workdir', ''):
+            working_dir = json.loads(task.args)['--workdir']
+        if json.loads(task.args).get('--working_dir', ''):
+            working_dir = json.loads(task.args)['--working_dir']
 
         if not pod or pod['status'] != 'Running':
             run_id = "debug-" + str(uuid.uuid4().hex)
@@ -615,7 +621,7 @@ class Task_ModelView_Base():
                     namespace=namespace,
                     pod_name=pod_name,
                     image=image,
-                    working_dir=None,
+                    working_dir=working_dir,
                     command=command,
                     args=None
                 )
@@ -708,9 +714,9 @@ class Task_ModelView_Base():
         # 没有历史或者没有运行态，直接创建
         if not pod:
             command = None
-            if task.job_template.entrypoint.strip():
+            if task.job_template.entrypoint and task.job_template.entrypoint.strip():
                 command = task.job_template.entrypoint.strip()
-            if task.command.strip():
+            if task.command and task.command.strip():
                 command = task.command.strip()
             if command:
                 command = command.split(" ")
@@ -823,7 +829,7 @@ class Task_ModelView_Base():
     def clear_task(self, task_id):
         task = db.session.query(Task).filter_by(id=task_id).first()
         self.delete_task_run(task)
-        flash(__("删除完成"), category='success')
+        # flash(__("删除完成"), category='success')
         # self.update_redirect()
         return redirect('/pipeline_modelview/api/web/%s' % str(task.pipeline.id))
 

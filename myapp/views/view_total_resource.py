@@ -422,46 +422,48 @@ class Total_Resource_ModelView_Api(MyappFormRestApi):
         all_task_resource = pipeline_resource_used['data']
         clusters = conf.get('CLUSTERS', {})
         for item in items:
-            cluster_name,namespace,org,pod_name = item.split(":")
-            cluster = clusters[cluster_name]
-            print(cluster_name,namespace,pod_name)
-            k8s_client = K8s(cluster.get('KUBECONFIG', ''))
-            pod = all_task_resource[cluster_name][namespace][org][pod_name]
-            # 如果是jupyter命名空间，直接删除pod
-            if namespace=='jupyter':
-                k8s_client.delete_pods(namespace=namespace,pod_name=pod_name)
-                k8s_client.delete_service(namespace=namespace,name=pod_name)
-                service_external_name = (pod_name + "-external").lower()[:60].strip('-')
-                k8s_client.delete_service(namespace=namespace, name=service_external_name)
-                k8s_client.delete_istio_ingress(namespace=namespace, name=pod_name)
-            # 如果是service命名空间，需要删除deployment和service和虚拟服务
-            if namespace=='service':
-                service_name = pod['label'].get("app",'')
-                if service_name:
-                    service_external_name = (service_name + "-external").lower()[:60].strip('-')
-                    k8s_client.delete_deployment(namespace=namespace, name=service_name)
-                    k8s_client.delete_service(namespace=namespace, name=service_name)
+            try:
+                cluster_name,namespace,org,pod_name = item.split(":")
+                cluster = clusters[cluster_name]
+                print(cluster_name,namespace,pod_name)
+                k8s_client = K8s(cluster.get('KUBECONFIG', ''))
+                pod = all_task_resource[cluster_name][namespace][org][pod_name]
+                # 如果是jupyter命名空间，直接删除pod
+                if namespace=='jupyter':
+                    k8s_client.delete_pods(namespace=namespace,pod_name=pod_name)
+                    k8s_client.delete_service(namespace=namespace,name=pod_name)
+                    service_external_name = (pod_name + "-external").lower()[:60].strip('-')
                     k8s_client.delete_service(namespace=namespace, name=service_external_name)
-                    k8s_client.delete_istio_ingress(namespace=namespace, name=service_name)
-            # 如果是aihub命名空间，需要删除 deployemnt和service和虚拟服务
-            if namespace == 'aihub':
-                service_name = pod['label'].get("app", '')
-                if service_name:
-                    k8s_client.delete_deployment(namespace=namespace, name=service_name)
-                    k8s_client.delete_service(namespace=namespace, name=service_name)
-                    k8s_client.delete_istio_ingress(namespace=namespace, name=service_name)
-            # 如果是pipeline命名空间，按照run-id进行删除，这里先只删除pod，也会造成任务停止
-            if namespace == 'pipeline':
-                k8s_client.delete_pods(namespace=namespace, pod_name=pod_name)
+                    k8s_client.delete_istio_ingress(namespace=namespace, name=pod_name)
+                # 如果是service命名空间，需要删除deployment和service和虚拟服务
+                if namespace=='service':
+                    service_name = pod['label'].get("app",'')
+                    if service_name:
+                        service_external_name = (service_name + "-external").lower()[:60].strip('-')
+                        k8s_client.delete_deployment(namespace=namespace, name=service_name)
+                        k8s_client.delete_service(namespace=namespace, name=service_name)
+                        k8s_client.delete_service(namespace=namespace, name=service_external_name)
+                        k8s_client.delete_istio_ingress(namespace=namespace, name=service_name)
+                # 如果是aihub命名空间，需要删除 deployemnt和service和虚拟服务
+                if namespace == 'aihub':
+                    service_name = pod['label'].get("app", '')
+                    if service_name:
+                        k8s_client.delete_deployment(namespace=namespace, name=service_name)
+                        k8s_client.delete_service(namespace=namespace, name=service_name)
+                        k8s_client.delete_istio_ingress(namespace=namespace, name=service_name)
+                # 如果是pipeline命名空间，按照run-id进行删除，这里先只删除pod，也会造成任务停止
+                if namespace == 'pipeline':
+                    k8s_client.delete_pods(namespace=namespace, pod_name=pod_name)
 
-            if namespace == 'automl':
-                vcjob_name = pod['label'].get("app", '')
-                k8s_client.delete_pods(namespace=namespace, pod_name=pod['name'])
-                if vcjob_name:
-                    k8s_client.delete_volcano(namespace=namespace, name=vcjob_name)
-                    k8s_client.delete_service(namespace=namespace,labels={'app':vcjob_name})
-                    k8s_client.delete_istio_ingress(namespace=namespace,name=pod['name'])
-
+                if namespace == 'automl':
+                    vcjob_name = pod['label'].get("app", '')
+                    k8s_client.delete_pods(namespace=namespace, pod_name=pod_name)
+                    if vcjob_name:
+                        k8s_client.delete_volcano(namespace=namespace, name=vcjob_name)
+                        k8s_client.delete_service(namespace=namespace,labels={'app':vcjob_name})
+                        k8s_client.delete_istio_ingress(namespace=namespace,name=pod_name)
+            except Exception as e:
+                print(e)
 
         return json.dumps(
             {
