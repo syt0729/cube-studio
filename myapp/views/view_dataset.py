@@ -31,7 +31,7 @@ from .base import (
 )
 from myapp import app, appbuilder, db
 from flask_appbuilder import expose
-from myapp.views.view_team import Project_Join_Filter, filter_join_org_project
+from myapp.views.view_team import Project_Join_Filter
 from myapp.models.model_dataset import Dataset
 import requests
 conf = app.config
@@ -249,11 +249,10 @@ class Dataset_ModelView_base():
             widget=BS3TextFieldWidget(),
         ),
         "project": QuerySelectField(
-            _('项目组'),
-            query_factory=lambda: db.session.query(Project),
+            label=_('项目组'),
             allow_blank=True,
-            widget=Select2Widget(extra_classes="readonly"),
-            description= _('只有creator可以添加修改组成员，可以添加多个creator')
+            widget=Select2Widget(),
+            validators=[]
         ),
         "owner": StringField(
             label= _('责任人'),
@@ -314,7 +313,7 @@ class Dataset_ModelView_base():
     def pre_delete(self, item):
         self.sync_label_studio(item, 'D')
 
-    @pysnooper.snoop()
+    # @pysnooper.snoop()
     def _merge_project_users(self, item):
         if item.owner == '*':
             return item.owner
@@ -327,7 +326,7 @@ class Dataset_ModelView_base():
             full_owner = ",".join(combined_usernames)
             return full_owner
 
-    @pysnooper.snoop()
+    # @pysnooper.snoop()
     def sync_label_studio(self, item, OpType = 'CR'):
             payload = {
                 'name': item.name,
@@ -556,6 +555,9 @@ class Dataset_ModelView_base():
 class Dataset_ModelView_Api(Dataset_ModelView_base, MyappModelRestApi):
     datamodel = SQLAInterface(Dataset)
     route_base = '/dataset_modelview/api'
+    add_form_query_rel_fields = {
+        "project": [["name", Project_Join_Filter, 'org']]
+    }
 
 
 appbuilder.add_api(Dataset_ModelView_Api)

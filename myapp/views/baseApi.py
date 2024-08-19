@@ -375,7 +375,7 @@ class MyappModelRestApi(ModelRestApi):
 
     # 建构响应体
     @staticmethod
-    @pysnooper.snoop()
+    # @pysnooper.snoop()
     def response(code, **kwargs):
         """
             Generic HTTP JSON response method
@@ -399,7 +399,7 @@ class MyappModelRestApi(ModelRestApi):
             flash_json.append([f[0], f[1]])
         resp.headers["api_flashes"] = json.dumps(flash_json)
         resp.headers["Content-Type"] = "application/json; charset=utf-8"
-        
+
         # 记录调用堆栈
         stack_trace = traceback.format_stack()
         app.logger.info(f"Call stack for response: {stack_trace}")
@@ -961,7 +961,7 @@ class MyappModelRestApi(ModelRestApi):
                 self.add_more_info(response, **kwargs)
             except Exception as e:
                 print(e)
-    @pysnooper.snoop()
+    # @pysnooper.snoop()
     def response_error(self, code, message='error', status=1, result={}):
         back_data = {
             'result': result,
@@ -1377,7 +1377,7 @@ class MyappModelRestApi(ModelRestApi):
 
     @event_logger.log_this
     @expose("/<int:pk>", methods=["DELETE"])
-    @pysnooper.snoop()
+    # @pysnooper.snoop()
     def api_delete(self, pk):
         item = self.datamodel.get(pk, self._base_filters)
         if not item:
@@ -1430,7 +1430,7 @@ class MyappModelRestApi(ModelRestApi):
 
     @event_logger.log_this
     @expose("/multi_action/<string:name>", methods=["POST"])
-    @pysnooper.snoop()
+    # @pysnooper.snoop()
     def multi_action(self, name):
         """
             Action method to handle multiple records selected from a list view
@@ -1447,7 +1447,7 @@ class MyappModelRestApi(ModelRestApi):
             message = back if type(back) == str else 'success'
             if fail_data:
                 return self.response_error(422, message=message)
-            else:    
+            else:
                 back = {
                     "status": 0,
                     "result": {},
@@ -1677,7 +1677,7 @@ class MyappModelRestApi(ModelRestApi):
     #     return response
 
     @action("muldelete", "删除", "确定删除所选记录?", "fa-trash", single=False)
-    @pysnooper.snoop()
+    # @pysnooper.snoop()
     def muldelete(self, items):
         if not items:
             abort(404)
