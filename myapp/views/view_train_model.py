@@ -6,7 +6,8 @@ from myapp.models.model_team import Project, Project_User
 from myapp.models.model_train_model import Training_Model
 from flask_babel import gettext as __
 from flask_babel import lazy_gettext as _
-from myapp import app, appbuilder, db
+from myapp import app, appbuilder, db, security_manager
+from sqlalchemy import or_
 import uuid
 from myapp.views.view_team import Project_Join_Filter
 
@@ -42,9 +43,15 @@ class Training_Model_Filter(MyappFilter):
     # @pysnooper.snoop()
     def apply(self, query, func):
         user_roles = [role.name.lower() for role in list(self.get_user_roles())]
+        join_projects_id = security_manager.get_join_projects_id(db.session)
         if "admin" in user_roles:
             return query
-        return query.filter(self.model.created_by_fk == g.user.id)
+        return query.filter(
+            or_(
+                self.model.project_id.in_(join_projects_id),
+                self.model.created_by_fk == g.user.id
+            )
+        )
 
 
 class Training_Model_ModelView_Base():
