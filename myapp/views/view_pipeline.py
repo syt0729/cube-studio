@@ -921,8 +921,14 @@ class Pipeline_ModelView_Base():
             db.session.delete(task)
 
         # 删除所有的workflow
-        db.session.query(Workflow).filter_by(foreign_key=str(pipeline.id)).delete()
-        db.session.query(RunHistory).filter_by(pipeline_id=pipeline.id).delete()
+        # db.session.query(Workflow).filter_by(foreign_key=str(pipeline.id)).delete()
+        # db.session.query(RunHistory).filter_by(pipeline_id=pipeline.id).delete()
+        # 只是删除了数据库记录，但是实例并没有删除，会重新监听更新的。
+        db.session.query(Workflow).filter_by(foreign_key=str(pipeline.id)).delete(synchronize_session=False)
+        db.session.commit()
+        db.session.query(Workflow).filter(Workflow.labels.contains(f'"pipeline-id": "{str(pipeline.id)}"')).delete(synchronize_session=False)
+        db.session.commit()
+        db.session.query(RunHistory).filter_by(pipeline_id=pipeline.id).delete(synchronize_session=False)
         db.session.commit()
 
 
