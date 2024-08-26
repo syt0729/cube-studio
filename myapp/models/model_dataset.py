@@ -73,6 +73,14 @@ class Dataset(Model,AuditMixinNullable,MyappModelBase):
                 html+='<a target=_blank href="%s">%s</a><br>'%(url.strip(),url.strip())
         return Markup('<div>%s</div>'%html)
 
+    def label_html(self):
+        urls = self.url.split('\n') if self.url else []
+        urls = [url.strip() for url in urls if url.strip()]
+        if urls:
+            url = urls[0]
+            return Markup('<a target=_blank href="%s">%s</a>'%(url.strip(), self.label))
+        return self.label
+        
     @property
     def path_html(self):
         paths= self.path.split('\n')

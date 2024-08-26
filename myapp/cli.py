@@ -452,7 +452,7 @@ def init():
                 dataset = Dataset()
                 dataset.name = kwargs['name']
                 dataset.field = kwargs.get('field', '')
-                dataset.version = 'latest'
+                dataset.version = kwargs.get('version', 'latest')
                 dataset.label = kwargs.get('label', '')
                 dataset.status = kwargs.get('status', '')
                 dataset.describe = kwargs.get('describe', '')
@@ -472,7 +472,8 @@ def init():
                 dataset.storage_class = kwargs.get('storage_class', '')
                 dataset.storage_size = kwargs.get('storage_size', '')
                 dataset.download_url = kwargs.get('download_url', '')
-                dataset.owner = 'admin'
+                dataset.owner = kwargs.get('owner', 'admin')
+                dataset.features = kwargs.get('features', '{}')
                 dataset.created_by_fk = 1
                 dataset.changed_by_fk = 1
                 db.session.add(dataset)

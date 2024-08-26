@@ -1,6 +1,7 @@
 import datetime
 import re
 import shutil
+import zipfile, pandas
 from urllib.parse import urlencode
 from flask_appbuilder import action
 from myapp.models.model_team import Project, Project_User
@@ -34,6 +35,8 @@ from flask_appbuilder import expose
 from myapp.views.view_team import Project_Join_Filter
 from myapp.models.model_dataset import Dataset
 import requests
+from myapp.utils import core
+
 conf = app.config
 
 from myapp.utils.core import ValidUserListValidator
@@ -69,9 +72,10 @@ class Dataset_ModelView_base():
     order_columns = ['id']
     base_filters = [["id", Dataset_Filter, lambda: []]]  # 设置权限过滤器
 
-    add_columns = ['name', 'version', 'label', 'describe', 'source_type', 'source', 'field',
-                   'usage', 'storage_class', 'file_type', 'url', 'download_url', 'path',
-                   'storage_size', 'entries_num', 'duration', 'price', 'status', 'icon','project', 'owner', 'features']
+    # add_columns = ['name', 'version', 'label', 'describe', 'source_type', 'source', 'field',
+    #                'usage', 'storage_class', 'file_type', 'url', 'download_url', 'path',
+    #                'storage_size', 'entries_num', 'duration', 'price', 'status', 'icon','project', 'owner', 'features']
+    add_columns = ['name', 'version', 'label', 'describe', 'url', 'download_url', 'path', 'icon','project', 'owner', 'features']
     show_columns = ['id', 'name', 'version', 'label', 'describe', 'segment', 'source_type', 'source',
                     'industry', 'field', 'usage', 'storage_class', 'file_type', 'status', 'url',
                     'path', 'download_url', 'storage_size', 'entries_num', 'duration', 'price', 'status', 'icon','project',
@@ -87,6 +91,7 @@ class Dataset_ModelView_base():
         "years": _("数据年份"),
         "url": _("相关网址"),
         "url_html": _("相关网址"),
+        "label_html": _("标签"),
         "path": _("本地路径"),
         "path_html": _("本地路径"),
         "entries_num": _("条目数量"),
@@ -100,12 +105,13 @@ class Dataset_ModelView_base():
     }
 
     edit_columns = add_columns
-    list_columns = ['icon_html', 'name', 'version', 'label', 'describe','project','owner', 'source_type', 'source', 'status',
-                    'field', 'url_html', 'download_url_html', 'usage', 'storage_class', 'file_type', 'path_html', 'storage_size', 'entries_num', 'price']
-
+    # list_columns = ['icon_html', 'name', 'version', 'label', 'describe','project','owner', 'source_type', 'source', 'status',
+    #                 'field', 'url_html', 'download_url_html', 'usage', 'storage_class', 'file_type', 'path_html', 'storage_size', 'entries_num', 'price']
+    list_columns = ['icon_html', 'name', 'version', 'label_html', 'describe','project', 'owner', 'ops_html', 'path_html', 'download_url_html']
     cols_width = {
-        "name": {"type": "ellip1", "width": 200},
+        "name": {"type": "ellip1", "width": 150},
         "label": {"type": "ellip2", "width": 200},
+        "label_html": {"type": "ellip2", "width": 200},
         "version": {"type": "ellip2", "width": 100},
         "describe": {"type": "ellip2", "width": 300},
         "field": {"type": "ellip1", "width": 100},
@@ -119,7 +125,7 @@ class Dataset_ModelView_base():
         "storage_size": {"type": "ellip1", "width": 100},
         "file_type": {"type": "ellip1", "width": 100},
         "project_id": {"type": "ellip1", "width": 200},
-        "owner": {"type": "ellip1", "width": 200},
+        "owner": {"type": "ellip1", "width": 150},
         "status": {"type": "ellip1", "width": 100},
         "entries_num": {"type": "ellip1", "width": 200},
         "duration": {"type": "ellip1", "width": 100},
@@ -128,37 +134,34 @@ class Dataset_ModelView_base():
         "usage": {"type": "ellip1", "width": 200},
         "research": {"type": "ellip2", "width": 100},
         "icon_html": {"type": "ellip1", "width": 100},
-        "ops_html": {"type": "ellip1", "width": 200},
+        "ops_html": {"type": "ellip1", "width": 150},
     }
 
     features_demo = '''
+    填写规则
 {
   "column1": {
     # feature type
-    "type": "dict,list,tuple,Value,Sequence,Array2D,Array3D,Array4D,Array5D,Translation,TranslationVariableLanguages,Audio,Image,Video,ClassLabel",
+    "_type": "dict,list,tuple,Value,Sequence,Array2D,Array3D,Array4D,Array5D,Translation,TranslationVariableLanguages,Audio,Image,Video",
 
     # data type in dict,list,tuple,Value,Sequence,Array2D,Array3D,Array4D,Array5D
     "dtype": "null,bool,int8,int16,int32,int64,uint8,uint16,uint32,uint64,float16,float32,float64,time32[(s|ms)],time64[(us|ns)],timestamp[(s|ms|us|ns)],timestamp[(s|ms|us|ns),tz=(tzstring)],date32,date64,duration[(s|ms|us|ns)],decimal128(precision,scale),decimal256(precision,scale),binary,large_binary,string,large_string"
 
-    # length of Sequence
-    "length": 10
-
-    # dimension of Array2D,Array3D,Array4D,Array5D
-    "shape": (1, 2, 3, 4, 5),
-
-    # sampling rate of Audio
-    "sampling_rate":16000,
-    "mono": true,
-    "decode": true
-
-    # decode of Image
-    "decode": true
-
-    # class of ClassLabel
-    "num_classes":3,
-    "names":['class1','class2','class3']
-
-  },
+    }
+}
+示例：
+{
+    "id": {
+        "_type": "Value",
+        "dtype": "string"
+    },
+    "image": {
+        "_type": "Image"
+    },
+    "box": {
+        "_type": "Value",
+        "dtype": "string"
+    }
 }
     '''
     add_form_extra_fields = {
@@ -174,7 +177,7 @@ class Dataset_ModelView_base():
             description= _('数据集版本'),
             default='latest',
             widget=BS3TextFieldWidget(),
-            validators=[DataRequired(), Regexp("^[a-z][a-z0-9_\-]*[a-z0-9]$"), ]
+            validators=[DataRequired(), Regexp("[a-z0-9_\-]*"), ]
         ),
         "subdataset": StringField(
             label= _('子数据集'),
@@ -269,25 +272,32 @@ class Dataset_ModelView_base():
         ),
         "url": StringField(
             label= _('相关网址'),
-            description='',
+            description='数据集介绍链接，可点击标签跳转',
             widget=MyBS3TextAreaFieldWidget(rows=3),
             default=''
         ),
         "path": StringField(
             label= _('本地路径'),
-            description='',
+            description='本地文件通过notebook上传到平台内，处理后，压缩成单个压缩文件，每行一个压缩文件地址',
             widget=MyBS3TextAreaFieldWidget(rows=3),
             default=''
         ),
         "download_url": StringField(
             label= _('下载地址'),
-            description='',
+            description='可以直接下载的链接地址，每行一个url',
             widget=MyBS3TextAreaFieldWidget(rows=3),
             default=''
         ),
+        "icon": StringField(
+            label=_('预览图'),
+            default='',
+            description=_('可以为图片地址，svg源码，或者帮助文档链接'),
+            widget=BS3TextFieldWidget(),
+            validators=[]
+        ),
         "features": StringField(
             label= _('特征列'),
-            description= _('数据集中的列信息'),
+            description= _('数据集中的列信息，要求数据集中要有data.csv文件用于表示数据集中的全部数据'),
             widget=MyBS3TextAreaFieldWidget(rows=3, tips=Markup('<pre><code>' + features_demo + "</code></pre>")),
             default=''
         )
@@ -302,10 +312,14 @@ class Dataset_ModelView_base():
             item.owner = g.user.username + ",*"
         if not item.icon:
             item.icon = '/static/assets/images/dataset.png'
+        if item.icon and '</svg>' in item.icon:
+            item.icon = re.sub(r'width="\d+(\.\d+)?(px)?"', f'width="50px"', item.icon)
+            item.icon = re.sub(r'height="\d+(\.\d+)?(px)?"', f'height="50px"', item.icon)
         if not item.version:
             item.version = 'latest'
         if not item.subdataset:
             item.subdataset = item.name
+        item.features = json.dumps(json.loads(item.features),indent=4,ensure_ascii=False) if item.features else "{}"
 
     def post_add(self, item):
         self.sync_label_studio(item)
@@ -317,7 +331,7 @@ class Dataset_ModelView_base():
     def _merge_project_users(self, item):
         if item.owner == '*':
             return item.owner
-        if item.project.id:
+        if item.project and item.project.id:
             project_users = db.session.query(MyUser.username).join(Project_User, Project_User.user_id == MyUser.id).filter(Project_User.project_id == item.project.id).all()
             project_usernames = [user.username for user in project_users]
             # 将 owner 和 project_usernames 合并并去重
@@ -326,7 +340,7 @@ class Dataset_ModelView_base():
             full_owner = ",".join(combined_usernames)
             return full_owner
 
-    # @pysnooper.snoop()
+    @pysnooper.snoop()
     def sync_label_studio(self, item, OpType = 'CR'):
             payload = {
                 'name': item.name,
@@ -337,7 +351,13 @@ class Dataset_ModelView_base():
             if OpType == "M":
                 owner = self.src_item_json.get('owner')
                 project_id = self.src_item_json.get('project_id')
-                if owner != item.owner or project_id != item.project.id:
+                is_project_modified = False
+                if item.project == None or not item.project.id:
+                    if project_id:
+                        is_project_modified = True
+                elif project_id != item.project.id:
+                    is_project_modified = True
+                if owner != item.owner or is_project_modified:
                     payload['owner'] = self._merge_project_users(item)
                     print(item.project.id)
                     print(item.owner)
@@ -484,7 +504,7 @@ class Dataset_ModelView_base():
         dataset = db.session.query(Dataset).filter_by(id=int(dataset_id)).first()
         try:
             download_url = []
-            if dataset.path:
+            if dataset.path and dataset.path.strip():
                 # 如果存储在集群数据集中心
                 # 如果存储在个人目录
                 paths = dataset.path.split('\n')
@@ -492,7 +512,7 @@ class Dataset_ModelView_base():
                     download_url.append(path2url(path))
 
             # 如果存储在外部链接
-            elif dataset.download_url:
+            elif dataset.download_url and dataset.download_url.strip():
                 download_url = dataset.download_url.split('\n')
             else:
                 # 如果存储在对象存储中
