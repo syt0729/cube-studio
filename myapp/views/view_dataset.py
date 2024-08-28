@@ -594,6 +594,7 @@ class Dataset_ModelView_Api(Dataset_ModelView_base, MyappModelRestApi):
     add_form_query_rel_fields = {
         "project": [["name", Project_Join_Filter, 'org']]
     }
+    edit_form_query_rel_fields = add_form_query_rel_fields
 
 
 appbuilder.add_api(Dataset_ModelView_Api)
