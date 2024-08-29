@@ -264,7 +264,7 @@ class Project_ModelView_org_Api(Project_ModelView_Base, MyappModelRestApi):
     route_base = '/project_modelview/org/api'
     datamodel = SQLAInterface(Project)
     project_type = 'org'
-    base_filters = [["id", Project_Filter, project_type]]
+    base_filters = [["id", Project_Join_Filter, project_type]]
     list_columns = ['name', 'project_user', 'type']
     related_views = [Project_User_ModelView_Api, ]
     label_title = _('项目分组')
