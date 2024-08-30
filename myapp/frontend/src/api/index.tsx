@@ -148,6 +148,9 @@ axios.interceptors.response.use(
             if (error.response.status === 401) {
                 handleTips.trigger('登录超时，需要重新登录');
                 handleTips.gotoLogin();
+            } else if (error.response.status === 421) {
+                handleTips.trigger(errMsg);
+                return Promise.resolve(error);
             } else if (error.response.status !== 422) {
                 handleTips.trigger(errMsg);
             }

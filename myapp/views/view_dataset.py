@@ -325,7 +325,7 @@ class Dataset_ModelView_base():
     def post_add(self, item):
         return self.sync_label_studio(item)
     @pysnooper.snoop()
-    def pre_delete(self, item):
+    def post_delete(self, item):
         return self.sync_label_studio(item, 'D')
 
     # @pysnooper.snoop()
@@ -378,15 +378,15 @@ class Dataset_ModelView_base():
                 if response.status_code == 404:
                     mes = response.json().get('type',None)
                     if mes == 'project':
-                        return self.response_error(404, message='当前数据集未同步到Label Studio')
+                        return self.response_error(421, message='当前数据集未同步到Label Studio')
                     else:
-                        return self.response_error(404, message='存在账号未同步到Label Studio')
+                        return self.response_error(421, message='存在账号未同步到Label Studio')
                 if response.status_code == 500:
-                    return self.response_error(404, message="Label Studio 内部有错, 请联系管理员 ")
+                    return self.response_error(421, message="Label Studio 内部有错, 请联系管理员 ")
             except ConnectionError as e:
-                return self.response_error(500, message="Label Studio 服务可能没开启")
+                return self.response_error(421, message="Label Studio 服务可能没开启")
             except Exception as e:
-                return self.response_error(500, message="Label Studio 服务不可用")
+                return self.response_error(421, message="Label Studio 服务不可用")
 
             if OpType == "CR":
                 rs = response.json()
@@ -404,6 +404,8 @@ class Dataset_ModelView_base():
 
     def pre_update(self, item):
         self.pre_add(item)
+
+    def post_update(self, item):
         return self.sync_label_studio(item, 'M')
 
     def check_edit_permission(self, item):

@@ -1358,14 +1358,14 @@ class MyappModelRestApi(ModelRestApi):
         if isinstance(item, dict):
             return self.response_error(422, message=item.errors)
         if self.pre_update:
-            pre_update_response = self.pre_update(item)
-            if pre_update_response:
-                return pre_update_response
+            self.pre_update(item)
 
         try:
             self.datamodel.edit(item, raise_exception=True)
             if self.post_update:
-                self.post_update(item)
+                post_update_response = self.post_update(item)
+                if post_update_response:
+                    return post_update_response
             result = self.edit_model_schema.dump(
                 item, many=False
             )
@@ -1397,12 +1397,13 @@ class MyappModelRestApi(ModelRestApi):
                 return self.response_error(422, message='no permission to delete')
 
         if self.pre_delete:
-            pre_delete_response = self.pre_delete(item)
-            if pre_delete_response:
-                return pre_delete_response
+            self.pre_delete(item)
         try:
             self.datamodel.delete(item, raise_exception=True)
-            self.post_delete(item)
+            if self.post_delete:
+                post_delete_response = self.post_delete(item)
+                if post_delete_response:
+                    return post_delete_response
             back_data = {
                 "status": 0,
                 "message": "success",
