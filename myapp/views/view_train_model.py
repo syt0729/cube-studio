@@ -60,7 +60,7 @@ class Training_Model_ModelView_Base():
     base_order = ('changed_on', 'desc')
     order_columns = ['id']
     list_columns = ['project_url', 'name', 'version',  'pipeline_url',
-                    'creator', 'modified', 'deploy', 'download', 'model_metric', 'framework', 'api_type']
+                    'creator', 'modified', 'download', 'model_metric', 'framework', 'api_type']
     search_columns = ['created_by', 'project', 'name', 'version', 'framework', 'api_type', 'pipeline_id', 'run_id',
                       'path']
     add_columns = ['project', 'name', 'version', 'describe', 'path', 'framework', 'run_id', 'run_time', 'metrics',

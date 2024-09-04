@@ -80,7 +80,7 @@ class Dataset_ModelView_base():
                     'industry', 'field', 'usage', 'storage_class', 'file_type', 'status', 'url',
                     'path', 'download_url', 'storage_size', 'entries_num', 'duration', 'price', 'status', 'icon','project',
                     'owner', 'features']
-    search_columns = ['name', 'version', 'label', 'describe', 'source_type', 'source', 'field', 'usage','storage_class', 'file_type', 'status', 'url', 'path', 'download_url']
+    search_columns = ['name', 'version', 'label', 'describe', 'project', 'owner']
     spec_label_columns = {
         "subdataset": _("子数据集名称"),
         "source_type": _("来源类型"),
@@ -107,7 +107,7 @@ class Dataset_ModelView_base():
     edit_columns = add_columns
     # list_columns = ['icon_html', 'name', 'version', 'label', 'describe','project','owner', 'source_type', 'source', 'status',
     #                 'field', 'url_html', 'download_url_html', 'usage', 'storage_class', 'file_type', 'path_html', 'storage_size', 'entries_num', 'price']
-    list_columns = ['icon_html', 'name', 'version', 'label_html', 'describe','project', 'owner', 'ops_html', 'path_html', 'download_url_html']
+    list_columns = ['icon_html', 'name', 'version', 'label_html', 'describe','project', 'owner', 'path', 'download_url_html']
     cols_width = {
         "name": {"type": "ellip1", "width": 150},
         "label": {"type": "ellip2", "width": 200},
@@ -120,7 +120,7 @@ class Dataset_ModelView_base():
         "industry": {"type": "ellip1", "width": 100},
         "url_html": {"type": "ellip1", "width": 200},
         "download_url_html": {"type": "ellip1", "width": 200},
-        "path_html": {"type": "ellip1", "width": 200},
+        "path": {"type": "ellip1", "width": 200},
         "storage_class": {"type": "ellip1", "width": 100},
         "storage_size": {"type": "ellip1", "width": 100},
         "file_type": {"type": "ellip1", "width": 100},
