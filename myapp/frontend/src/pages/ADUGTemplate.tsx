@@ -1016,11 +1016,11 @@ export default function TaskListManager(props?: IAppMenuItem) {
                             });
                         })
                         .catch(err => {
-                            message.error(`${t('更新')} ${labelTitle} ${t('失败')}`)
+                            const mes = err.response.status === 422? err.response.data.message: `${t('更新')} ${labelTitle} ${t('失败')}`
+                            message.error(mes)
                         })
                         .finally(() => { setLoadingUpdate(false) })
-                }}
-            >
+                }}>
                 {
                     (form: FormInstance) => <DynamicForm form={form} primaryKey={primaryKey} config={dynamicFormConfigUpdate} linkageConfig={columnRelateFormat} configGroup={dynamicFormGroupConfigUpdate} />
                 }

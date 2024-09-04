@@ -1294,9 +1294,13 @@ class MyappModelRestApi(ModelRestApi):
         if isinstance(item, dict):
             return self.response_error(422, message=item.errors)
         try:
-            self.pre_add(item)
+            if self.pre_add:
+                self.pre_add(item)
             self.datamodel.add(item, raise_exception=True)
-            self.post_add(item)
+            if self.post_add:
+                post_add_response = self.post_add(item)
+            if post_add_response:
+                return post_add_response
             result_data = self.add_model_schema.dump(item, many=False)
             result_data[self.primary_key] = self.datamodel.get_pk_value(item)
             back_data = {
@@ -1315,7 +1319,7 @@ class MyappModelRestApi(ModelRestApi):
 
     @event_logger.log_this
     @expose("/<int:pk>", methods=["PUT"])
-    # @pysnooper.snoop(watch_explode=('item','data'))
+    @pysnooper.snoop(watch_explode=('item','data'))
     def api_edit(self, pk):
 
         item = self.datamodel.get(pk, self._base_filters)
@@ -1353,12 +1357,15 @@ class MyappModelRestApi(ModelRestApi):
         # This validates custom Schema with custom validations
         if isinstance(item, dict):
             return self.response_error(422, message=item.errors)
-        self.pre_update(item)
+        if self.pre_update:
+            self.pre_update(item)
 
         try:
             self.datamodel.edit(item, raise_exception=True)
             if self.post_update:
-                self.post_update(item)
+                post_update_response = self.post_update(item)
+                if post_update_response:
+                    return post_update_response
             result = self.edit_model_schema.dump(
                 item, many=False
             )
@@ -1377,7 +1384,7 @@ class MyappModelRestApi(ModelRestApi):
 
     @event_logger.log_this
     @expose("/<int:pk>", methods=["DELETE"])
-    # @pysnooper.snoop()
+    @pysnooper.snoop()
     def api_delete(self, pk):
         item = self.datamodel.get(pk, self._base_filters)
         if not item:
@@ -1393,7 +1400,10 @@ class MyappModelRestApi(ModelRestApi):
             self.pre_delete(item)
         try:
             self.datamodel.delete(item, raise_exception=True)
-            self.post_delete(item)
+            if self.post_delete:
+                post_delete_response = self.post_delete(item)
+                if post_delete_response:
+                    return post_delete_response
             back_data = {
                 "status": 0,
                 "message": "success",

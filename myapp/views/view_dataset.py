@@ -14,6 +14,7 @@ from flask_appbuilder.fieldwidgets import BS3TextFieldWidget, Select2Widget, Sel
 from myapp.forms import MyBS3TextAreaFieldWidget, MySelect2Widget, MyCommaSeparatedListField, MySelect2ManyWidget, \
     MySelectMultipleField
 from flask import jsonify, Markup, make_response
+from requests.exceptions import ConnectionError
 from .baseApi import MyappModelRestApi
 from flask import g, request, redirect
 import json, os, sys
@@ -322,10 +323,10 @@ class Dataset_ModelView_base():
         item.features = json.dumps(json.loads(item.features),indent=4,ensure_ascii=False) if item.features else "{}"
 
     def post_add(self, item):
-        self.sync_label_studio(item)
-
-    def pre_delete(self, item):
-        self.sync_label_studio(item, 'D')
+        return self.sync_label_studio(item)
+    @pysnooper.snoop()
+    def post_delete(self, item):
+        return self.sync_label_studio(item, 'D')
 
     # @pysnooper.snoop()
     def _merge_project_users(self, item):
@@ -339,6 +340,7 @@ class Dataset_ModelView_base():
             combined_usernames = owner_usernames.union(project_usernames)
             full_owner = ",".join(combined_usernames)
             return full_owner
+        return item.owner
 
     @pysnooper.snoop()
     def sync_label_studio(self, item, OpType = 'CR'):
@@ -371,14 +373,28 @@ class Dataset_ModelView_base():
                 'Authorization': ls_token
             }
             ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
-            response = requests.post(ls_domain+"/api/projects/sync-dataset", data=urlencode(payload), headers=headers)
+            try:
+                response = requests.post(ls_domain+"/api/projects/sync-dataset", data=urlencode(payload), headers=headers)
+                if response.status_code == 404:
+                    mes = response.json().get('type',None)
+                    if mes == 'project':
+                        return self.response_error(421, message='当前数据集未同步到Label Studio')
+                    else:
+                        return self.response_error(421, message='存在账号未同步到Label Studio')
+                if response.status_code == 500:
+                    return self.response_error(421, message="Label Studio 内部有错, 请联系管理员 ")
+            except ConnectionError as e:
+                return self.response_error(421, message="Label Studio 服务可能没开启")
+            except Exception as e:
+                return self.response_error(421, message="Label Studio 服务不可用")
+
             if OpType == "CR":
                 rs = response.json()
                 download_url = rs.get('project_dir',None)
                 if download_url:
                     dataset = db.session.query(Dataset).filter_by(id=int(item.id)).first()
                     if dataset:
-                        # 更新 dodownload_url 字段
+                        # 更新 download_url 字段
                         dataset.download_url = download_url
 
                         # 提交更改
@@ -388,7 +404,9 @@ class Dataset_ModelView_base():
 
     def pre_update(self, item):
         self.pre_add(item)
-        self.sync_label_studio(item, 'M')
+
+    def post_update(self, item):
+        return self.sync_label_studio(item, 'M')
 
     def check_edit_permission(self, item):
         if not g.user.is_admin() and g.user.username != item.created_by.username and g.user.username not in item.owner:
@@ -578,6 +596,7 @@ class Dataset_ModelView_Api(Dataset_ModelView_base, MyappModelRestApi):
     add_form_query_rel_fields = {
         "project": [["name", Project_Join_Filter, 'org']]
     }
+    edit_form_query_rel_fields = add_form_query_rel_fields
 
 
 appbuilder.add_api(Dataset_ModelView_Api)
