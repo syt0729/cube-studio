@@ -310,11 +310,19 @@ class MyappModelRestApi(ModelRestApi):
     def pre_update_web(self, item):
         pass
 
+    def add_customize_json_data(self, json_data):
+        return json_data
+    def edit_customize_json_data(self, json_data):
+        return json_data
+
+
     edit_form_extra_fields = {}
     add_form_extra_fields = {}
     add_fieldsets = []
     edit_fieldsets = []
     show_fieldsets = []
+    add_readonly = {}
+    edit_readonly = {}
 
     ops_link = [
         # {
@@ -657,7 +665,7 @@ class MyappModelRestApi(ModelRestApi):
         return new_columns
 
     # add_form_extra_fields  里面的字段要能拿到才对
-    #@pysnooper.snoop(prefix="merge_add_field_info here.............: ")
+    @pysnooper.snoop(watch=['add_columns', 'self.add_readonly'])
     def merge_add_field_info(self, response, **kwargs):
         _kwargs = kwargs.get("add_columns", {})
         # 将关联字段的查询限制条件加入
@@ -670,6 +678,9 @@ class MyappModelRestApi(ModelRestApi):
             self.add_query_rel_fields,
             **_kwargs,
         )
+        for col in add_columns:
+            if col['name'] in self.add_readonly:
+                col['readonly'] = self.add_readonly[col['name']]
         add_columns = self.merge_expand_field_info(add_columns)
 
         response[API_ADD_COLUMNS_RES_KEY] = add_columns
@@ -689,6 +700,11 @@ class MyappModelRestApi(ModelRestApi):
         for column in edit_columns:
             if column.get('retry_info', False):
                 column['disable'] = True
+        for col in edit_columns:
+            if col['name'] in self.edit_readonly:
+                col['readonly'] = self.edit_readonly[col['name']]
+                if col['ui-type'] == 'select2':
+                    col['ui-type'] = 'select'
         edit_columns = self.merge_expand_field_info(edit_columns)
         response[API_EDIT_COLUMNS_RES_KEY] = edit_columns
 
@@ -969,7 +985,6 @@ class MyappModelRestApi(ModelRestApi):
             'message': message
         }
         return self.response(code, **back_data)
-
     @expose("/_info", methods=["GET"])
     @merge_response_func(merge_more_info, 'more_info')
     @merge_response_func(merge_ops_data, API_IMPORT_DATA_RIS_KEY)
@@ -1273,6 +1288,8 @@ class MyappModelRestApi(ModelRestApi):
             return self.response_error(400, message="Request is not JSON")
         try:
             json_data = request.get_json(silent=True)
+            if self.add_customize_json_data:
+                json_data = self.add_customize_json_data(json_data)
             for key in json_data:
                 if type(json_data[key]) == str:
                     json_data[key] = json_data[key].strip(" ")  # 所有输入去除首尾空格，避免误输入
@@ -1337,6 +1354,8 @@ class MyappModelRestApi(ModelRestApi):
             return self.response_error(404, message='Not found')
         try:
             json_data = request.get_json(silent=True)
+            if self.edit_customize_json_data:
+                json_data = self.edit_customize_json_data(json_data)
             for key in json_data:
                 if type(json_data[key]) == str:
                     json_data[key] = json_data[key].strip(" ")  # 所有输入去除首尾空格，避免误输入
@@ -1847,7 +1866,7 @@ class MyappModelRestApi(ModelRestApi):
             ret[col] = self.label_columns.get(col,col)
 
         return ret
-
+    # @pysnooper.snoop(prefix="make_ui_info here.............: ")
     def make_ui_info(self, ret_src):
         ret = copy.deepcopy(ret_src)
         # 可序列化处理
@@ -1899,6 +1918,9 @@ class MyappModelRestApi(ModelRestApi):
             ret['values'] = values
             if not ret.get('ui-type', ''):
                 ret['ui-type'] = 'select2' if 'SelectMultiple' in ret['type'] else 'select'
+        # 特别处理QuerySelectMultipleField
+        if ret.get('type', '') == 'QuerySelectMultiple':
+            ret['ui-type'] = 'select2'
 
         # 字符串
         if ret.get('ui-type', '') not in ['list', 'datePicker']:  # list,datePicker 类型，保持原样
@@ -1936,7 +1958,7 @@ class MyappModelRestApi(ModelRestApi):
 
         return ret
 
-    #@pysnooper.snoop(prefix="filed2ui here.............: ")
+    # @pysnooper.snoop(prefix="filed2ui here.............: ")
     def filed2ui(self,column_name,column_field,ret_src={}):
         ret = copy.deepcopy(ret_src)
         column_field_kwargs = column_field.kwargs
@@ -2002,7 +2024,7 @@ class MyappModelRestApi(ModelRestApi):
                     ret['choices'] = [[x, x] for x in list(set(field_contents))]
         return ret
 
-    #@pysnooper.snoop(prefix="_get_field_info here.............: ")
+    # @pysnooper.snoop(prefix="_get_field_info here.............: ")
     def _get_field_info(self, field, filter_rel_field, page=None, page_size=None):
         """
             Return a dict with field details

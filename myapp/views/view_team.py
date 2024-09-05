@@ -1,5 +1,7 @@
 import re
 
+from myapp.security import MyUser
+from flask import flash, g, request
 from myapp.views.baseSQLA import MyappSQLAInterface as SQLAInterface
 from flask_babel import gettext as __
 from flask_babel import lazy_gettext as _
@@ -13,6 +15,9 @@ from myapp.exceptions import MyappException
 from myapp import db, security_manager
 from myapp.forms import MyBS3TextFieldWidget, MyBS3TextAreaFieldWidget
 from wtforms.validators import DataRequired
+from flask_appbuilder.fieldwidgets import Select2ManyWidget
+from wtforms.ext.sqlalchemy.fields import QuerySelectMultipleField
+from sqlalchemy.exc import IntegrityError
 from flask import (
     flash,
     g
@@ -24,7 +29,8 @@ from .base import (
     MyappModelView,
 )
 from .baseApi import (
-    MyappModelRestApi
+    MyappModelRestApi,
+    expose
 )
 import json
 from flask_appbuilder import CompactCRUDMixin
@@ -57,6 +63,24 @@ class Project_Join_Filter(MyappFilter):
         join_projects_id = security_manager.get_join_projects_id(db.session)
         return query.filter(self.model.id.in_(join_projects_id)).filter(self.model.type==value).order_by(self.model.id.desc())
 
+class Project_Filter(MyappFilter):
+    # @pysnooper.snoop()
+    def apply(self, query, value):
+        project_id = request.args.get('info')
+        return query.filter(self.model.id == project_id).order_by(self.model.id.desc())
+
+
+class ExcludeProjectUsersFilter(MyappFilter):
+    def apply(self, query, value):
+        project_id = request.args.get('info')
+
+        # 获取当前项目组的用户ID
+        existing_user_ids = db.session.query(Project_User.user_id).filter_by(project_id=project_id).all()
+        existing_user_ids = [user_id[0] for user_id in existing_user_ids]
+
+        # 返回不在当前项目组的用户
+        return query.filter(MyUser.id.notin_(existing_user_ids))
+
 # table show界面下的
 class Project_User_ModelView_Base():
     label_title = _('组成员')
@@ -66,17 +90,31 @@ class Project_User_ModelView_Base():
     list_columns = ['user', 'role']
 
     add_form_query_rel_fields = {
-        "project": [["name", Project_Join_Filter, 'org']]
+        "project": [["name", Project_Filter, 'org']],
+        "user": [["name", ExcludeProjectUsersFilter, 'user']]
     }
-    # base_filters = [["id", Project_users_Filter, __('org')]]
 
+    # base_filters = [["id", Project_users_Filter, __('org')]]
+    add_readonly = {
+        "project":True
+    }
+    edit_readonly = {
+        "project":True,
+        "user":True
+    }
     add_form_extra_fields = {
         "project": QuerySelectField(
-            _('项目组'),
+             _('项目组'),
             query_factory=lambda: db.session.query(Project),
+            allow_blank=False,  # 如果项目是固定的，可以设置为 False 以避免空选项
+            widget=Select2Widget(extra_classes="readonly")
+        ),
+        "user": QuerySelectMultipleField(
+            _('用户'),
+            query_factory=lambda: db.session.query(MyUser),
             allow_blank=True,
-            widget=Select2Widget(extra_classes="readonly"),
-            description= _('只有creator可以添加修改组成员，可以添加多个creator')
+            widget=Select2ManyWidget(extra_classes="readonly"),
+            description= _('只有creator可以添加修改组成员，可以添加多个creator'),
         ),
         "role": SelectField(
             _('成员角色'),
@@ -90,18 +128,28 @@ class Project_User_ModelView_Base():
     edit_form_extra_fields = add_form_extra_fields
 
     # @pysnooper.snoop()
-    def pre_add_req(self,req_json):
+    def pre_add_req(self, req_json):
         user_roles = [role.name.lower() for role in list(get_user_roles())]
         if "admin" in user_roles:
             return req_json
-        creators = db.session().query(Project_User).filter_by(project_id=req_json.get('project')).all()
-        for i in range(0, len(creators)):
-            creators[i] = creators[i].user.username
-        if g.user.username not in creators:
-            raise MyappException('just creator can add/edit user')
+
+        creators = db.session.query(Project_User).filter_by(project_id=req_json.get('project')).all()
+        creator_usernames = [creator.user.username for creator in creators]
+
+        for user_id in req_json.get('user', []):
+            user = db.session.query(MyUser).get(user_id)
+            if user.username not in creator_usernames:
+                raise MyappException(f'User {user.username} is not a creator and cannot be added/edited')
+
+        return req_json
 
     pre_update_req=pre_add_req
 
+    def add_customize_json_data(self, json_data):
+        if "filter_id" in json_data:
+                json_data['project'] = json_data["filter_id"]
+                del json_data["filter_id"]
+        return json_data
 
 class Project_User_ModelView(Project_User_ModelView_Base, CompactCRUDMixin, MyappModelView):
     datamodel = SQLAInterface(Project_User)
@@ -113,9 +161,6 @@ appbuilder.add_view_no_menu(Project_User_ModelView)
 class Project_User_ModelView_Api(Project_User_ModelView_Base, MyappModelRestApi):
     datamodel = SQLAInterface(Project_User)
     route_base = '/project_user_modelview/api'
-    # add_columns = ['user', 'role']
-    add_columns = ['project', 'user', 'role']
-    edit_columns = add_columns
 
 
 appbuilder.add_api(Project_User_ModelView_Api)

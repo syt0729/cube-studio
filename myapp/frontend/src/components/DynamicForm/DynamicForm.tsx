@@ -331,9 +331,11 @@ export default function DynamicForm(props: IProps) {
         </Form.Item>
     }
     const renderSelect = (config: IDynamicFormConfigItem, itemProps: Record<string, any>) => {
-        // const rules = [
-        //     { required: config.required, message: `${t('请选择')}${config.label}` },
-        // ]
+        const hidden = config.data.readonly
+        const otherProps = {
+            hidden,
+            ...itemProps
+        }
         const options: LabeledValue[] = config.options || []
         return <Form.Item
             key={`dynamicForm_${config.name}`}
@@ -362,7 +364,7 @@ export default function DynamicForm(props: IProps) {
                     </div> : null
                 }
             </>}
-            {...itemProps}
+            {...otherProps}
         >
             <Select
                 style={{ width: '100%' }}

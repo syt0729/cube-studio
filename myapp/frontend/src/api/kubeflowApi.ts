@@ -14,10 +14,10 @@ export const userLogout = (): Promise<AxiosResponse<IAppMenuItem[]>> => {
     return axios.get('/logout')
 }
 
-export const getADUGTemplateApiInfo = (url?: string, id?: string): Promise<AxiosResponse<IADUGTemplateInfo>> => {
+export const getADUGTemplateApiInfo = (url?: string, info?: any): Promise<AxiosResponse<IADUGTemplateInfo>> => {
     return axios.get(`${url || ''}_info`, {
         params: {
-            id
+            ...info
         }
     })
 }

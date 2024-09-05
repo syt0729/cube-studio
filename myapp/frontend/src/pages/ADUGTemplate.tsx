@@ -128,6 +128,8 @@ export default function TaskListManager(props?: IAppMenuItem) {
     const [pageSize, setPageSize] = useState(PAGE_SIZE)
     const [listTitle, setListTitle] = useState<string>()
 
+    const [update, setUpdate] = useState(false)
+
     const { t, i18n } = useTranslation();
 
     const [scrollY, setScrollY] = useState("")
@@ -223,12 +225,18 @@ export default function TaskListManager(props?: IAppMenuItem) {
         })
     }
 
+    function getInfoFromLocation(url:string) {
+        const regex = /id=(\d+)/;
+        const match = url.match(regex);
+        return match ? match[1] : null;
+    }
+
     useEffect(() => {
         const targetId = getParam('targetId')
         const url = targetId ? `/dimension_remote_table_modelview/${targetId}/api/` : props?.url
         setLoadingAdd(true)
-
-        getADUGTemplateApiInfo(url).then(res => {
+        const info = getInfoFromLocation(location.search) || undefined
+        getADUGTemplateApiInfo(url, {info}).then(res => {
             const {
                 list_columns,
                 label_columns,
@@ -584,6 +592,8 @@ export default function TaskListManager(props?: IAppMenuItem) {
                     handleReTryInfo(tar)
                 }
             }
+            const formReset = add_columns.filter((item) => item.readonly).map(column => ({ [column.name]: column.values[0].id })).reduce((pre, next) => ({ ...pre, ...next }), {})
+            setDynamicFormDataAdd(formReset)
 
             const updateColumnsMap = edit_columns.reduce((pre: any, next: any) => ({ ...pre, [next.name]: next }), {})
             edit_columns.forEach((item) => {
@@ -682,7 +692,7 @@ export default function TaskListManager(props?: IAppMenuItem) {
             setLoading(false)
             setLoadingAdd(false)
         })
-    }, []);
+    }, [update]);
 
     const formatFilterParams = (params: any[], paramsMap: Record<string, any>) => {
         let formatData = undefined
@@ -889,13 +899,7 @@ export default function TaskListManager(props?: IAppMenuItem) {
                         message.success(`${t('添加')} ${labelTitle} ${t('成功')}`)
                         form.resetFields()
                         setVisableAdd(false)
-                        fetchData({
-                            ...fetchDataParams,
-                            pageConf: pageInfo,
-                            params: filterValues,
-                            sorter: sorterParam,
-                            paramsMap: filterParamsMap
-                        });
+                        setUpdate(!update)
                     }).catch(err => {
                         message.error(`${t('添加')} ${labelTitle} ${t('失败')}`)
                     }).finally(() => {
