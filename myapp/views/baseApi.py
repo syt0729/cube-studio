@@ -665,7 +665,7 @@ class MyappModelRestApi(ModelRestApi):
         return new_columns
 
     # add_form_extra_fields  里面的字段要能拿到才对
-    @pysnooper.snoop(watch=['add_columns', 'self.add_readonly'])
+    # @pysnooper.snoop(watch=['add_columns', 'self.add_readonly'])
     def merge_add_field_info(self, response, **kwargs):
         _kwargs = kwargs.get("add_columns", {})
         # 将关联字段的查询限制条件加入
@@ -1336,7 +1336,7 @@ class MyappModelRestApi(ModelRestApi):
 
     @event_logger.log_this
     @expose("/<int:pk>", methods=["PUT"])
-    @pysnooper.snoop(watch_explode=('item','data'))
+    # @pysnooper.snoop(watch_explode=('item','data'))
     def api_edit(self, pk):
 
         item = self.datamodel.get(pk, self._base_filters)
@@ -1403,7 +1403,7 @@ class MyappModelRestApi(ModelRestApi):
 
     @event_logger.log_this
     @expose("/<int:pk>", methods=["DELETE"])
-    @pysnooper.snoop()
+    # @pysnooper.snoop()
     def api_delete(self, pk):
         item = self.datamodel.get(pk, self._base_filters)
         if not item:

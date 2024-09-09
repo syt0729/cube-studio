@@ -144,14 +144,14 @@ class Project_User_ModelView_Base():
             return False
         else:
             return True
-    
+
     # @pysnooper.snoop()
     def check_edit_permission(self, item):
         if self.is_creator(item.project_id):
             return True
         else:
             return False
-        
+
     def pre_add_req(self,req_json):
         if self.is_creator(req_json.get('project')):
             return req_json
@@ -208,11 +208,74 @@ class Project_User_ModelView_Base():
 
     pre_update_req=pre_add_req
 
-    def add_customize_json_data(self, json_data):
-        if "filter_id" in json_data:
+    @expose("/", methods=["POST"])
+    @pysnooper.snoop(watch_explode=('items', 'json_data','json_data_list'))
+    def api_add(self):
+        self.src_item_json = {}
+        if not request.is_json:
+            return self.response_error(400, message="Request is not JSON")
+        try:
+            json_data = request.get_json(silent=True)
+            for key in json_data:
+                if isinstance(json_data[key], str):
+                    json_data[key] = json_data[key].strip(" ")  # 所有输入去除首尾空格，避免误输入
+            if "filter_id" in json_data:
                 json_data['project'] = json_data["filter_id"]
                 del json_data["filter_id"]
-        return json_data
+
+
+            if self.pre_add_req:
+                json_data_temp = self.pre_add_req(req_json=json_data)
+                if json_data_temp:
+                    json_data = json_data_temp
+
+            # 处理扩展字段
+            if self.expand_columns:
+                json_data = self.to_expand(json_data)
+
+            # 多选 user 字段的处理
+            users = json_data.get('user', [])
+            user_ids = [int(user.strip()) for user in users.split(',')]
+            if isinstance(user_ids, list):
+                json_data_list = []
+                for user in user_ids:
+                    temp_data = json_data.copy()
+                    temp_data['user'] = user
+                    json_data_list.append(temp_data)
+            else:
+                json_data_list = [json_data]  # 单选情况
+
+            items = []
+            for data in json_data_list:
+                item = self.add_model_schema.load(data)
+                if isinstance(item, dict):
+                    return self.response_error(422, message=item.errors)
+                items.append(item)
+        except Exception as err:
+            flash(str(err), 'error')
+            return self.response_error(422, message=str(err))
+
+        try:
+            for item in items:
+                self.datamodel.add(item, raise_exception=True)
+
+            result_data = [self.add_model_schema.dump(item, many=False) for item in items]
+            for res_data, item in zip(result_data, items):
+                res_data[self.primary_key] = self.datamodel.get_pk_value(item)
+
+            back_data = {
+                'result': result_data,
+                "status": 0,
+                'message': "success"
+            }
+            return self.response(
+                200,
+                **back_data,
+            )
+        except IntegrityError as e:
+            return self.response_error(422, message=str(e.orig))
+        except Exception as e1:
+            return self.response_error(500, message=str(e1))
 
 class Project_User_ModelView(Project_User_ModelView_Base, CompactCRUDMixin, MyappModelView):
     datamodel = SQLAInterface(Project_User)
@@ -363,7 +426,7 @@ class Project_ModelView_job_template_Api(Project_ModelView_Base, MyappModelRestA
         )
     }
     add_form_extra_fields = edit_form_extra_fields
-    
+
 
     def pre_add_req(self, req_json):
         user_roles = [role.name.lower() for role in list(get_user_roles())]
