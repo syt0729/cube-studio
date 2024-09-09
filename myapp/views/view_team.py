@@ -20,7 +20,8 @@ from wtforms.ext.sqlalchemy.fields import QuerySelectMultipleField
 from sqlalchemy.exc import IntegrityError
 from flask import (
     flash,
-    g
+    g,
+    abort
 )
 import pysnooper
 from .base import (
@@ -34,6 +35,7 @@ from .baseApi import (
 )
 import json
 from flask_appbuilder import CompactCRUDMixin
+from flask_appbuilder.actions import action
 from myapp.utils.py.py_k8s import K8s
 # # 获取某类project分组
 # class Project_users_Filter(MyappFilter):
@@ -128,20 +130,81 @@ class Project_User_ModelView_Base():
     edit_form_extra_fields = add_form_extra_fields
 
     # @pysnooper.snoop()
-    def pre_add_req(self, req_json):
+    def is_creator(self, proj_id):
         user_roles = [role.name.lower() for role in list(get_user_roles())]
         if "admin" in user_roles:
+            return True
+        creators = db.session().query(Project_User).filter_by(project_id=proj_id).all()
+        for i in range(0, len(creators)):
+            if (creators[i].role) == 'creator':
+                creators[i] = creators[i].user.username
+            else:
+                creators[i] = ''
+        if g.user.username not in creators:
+            return False
+        else:
+            return True
+    
+    # @pysnooper.snoop()
+    def check_edit_permission(self, item):
+        if self.is_creator(item.project_id):
+            return True
+        else:
+            return False
+        
+    def pre_add_req(self,req_json):
+        if self.is_creator(req_json.get('project')):
             return req_json
+        else:
+            raise MyappException('only creator can add/edit user')
 
-        creators = db.session.query(Project_User).filter_by(project_id=req_json.get('project')).all()
-        creator_usernames = [creator.user.username for creator in creators]
+    # @pysnooper.snoop()
+    def check_delete_permission(self,item):
+        user_roles = [role.name.lower() for role in list(get_user_roles())]
+        role = (db.session().query(Project_User).filter_by(project_id = item.project_id)
+                                                .filter_by(user_id = g.user.id).first()).role
+        if "admin" in user_roles or role == 'creator':
+            return True
+        return False
 
-        for user_id in req_json.get('user', []):
-            user = db.session.query(MyUser).get(user_id)
-            if user.username not in creator_usernames:
-                raise MyappException(f'User {user.username} is not a creator and cannot be added/edited')
-
-        return req_json
+    @action("muldelete", "删除", "确定删除所选记录?", "fa-trash", single=False)
+    # @pysnooper.snoop(prefix='team_muldel')
+    def muldelete(self, items):
+        if not items or not items[0]:
+            abort(404)
+        success = []
+        fail = []
+        if not self.is_creator(items[0].project_id):
+            flash('only creator can delete user', 'error')
+            return json.dumps(
+                {
+                    "success": [],
+                    "fail": ['no permit to delete']
+                }, indent=4, ensure_ascii=False
+            )
+        try:
+            for item in items:
+                try:
+                    self.pre_delete(item)
+                    db.session.delete(item)
+                    success.append(item.to_json())
+                except Exception as e:
+                    flash(str(e), "danger")
+                    fail.append(item.to_json())
+            db.session.commit()
+        except Exception as e:
+            # 捕获其他未预见的异常
+            db.session.rollback()
+            fail.append('error')
+            success = []
+        # finally:
+        #     db.session.remove()
+        return json.dumps(
+            {
+                "success": success,
+                "fail": fail
+            }, indent=4, ensure_ascii=False
+        )
 
     pre_update_req=pre_add_req
 
@@ -300,7 +363,60 @@ class Project_ModelView_job_template_Api(Project_ModelView_Base, MyappModelRestA
         )
     }
     add_form_extra_fields = edit_form_extra_fields
+    
 
+    def pre_add_req(self, req_json):
+        user_roles = [role.name.lower() for role in list(get_user_roles())]
+        if "admin" in user_roles:
+            return req_json
+        else:
+            raise MyappException('only admin can add')
+
+    # @pysnooper.snoop()
+    def check_delete_permission(self, item):
+        # creatros = item.get_creators()
+        if not g.user.is_admin():
+            return False
+        return True
+
+    @action("muldelete", "删除", "确定删除所选记录?", "fa-trash", single=False)
+    # @pysnooper.snoop(prefix='job_template_muldel')
+    def muldelete(self, items):
+        if not items:
+            abort(404)
+        success = []
+        fail = []
+        if not g.user.is_admin():
+            flash('only admin can delete', 'error')
+            return json.dumps(
+                {
+                    "success": [],
+                    "fail": ['only admin can delete']
+                }, indent=4, ensure_ascii=False
+            )
+        try:
+            for item in items:
+                try:
+                    self.pre_delete(item)
+                    db.session.delete(item)
+                    success.append(item.to_json())
+                except Exception as e:
+                    flash(str(e), "danger")
+                    fail.append(item.to_json())
+            db.session.commit()
+        except Exception as e:
+            # 捕获其他未预见的异常
+            db.session.rollback()
+            fail.append('error')
+            success = []
+        # finally:
+        #     db.session.remove()
+        return json.dumps(
+            {
+                "success": success,
+                "fail": fail
+            }, indent=4, ensure_ascii=False
+        )
 
 appbuilder.add_api(Project_ModelView_job_template_Api)
 
