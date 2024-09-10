@@ -16,12 +16,13 @@ from flask_appbuilder.fieldwidgets import BS3TextFieldWidget
 from myapp.forms import MyBS3TextAreaFieldWidget, MySelect2Widget
 from flask_appbuilder import expose
 from .baseApi import MyappModelRestApi
-from flask import g
+from flask import g, abort, flash
 from .base import (
     DeleteMixin,
     MyappFilter,
     MyappModelView,
 )
+from flask_appbuilder.actions import action
 
 conf = app.config
 
@@ -198,6 +199,43 @@ class Images_ModelView_Base():
             return False
         return True
     check_delete_permission = check_edit_permission
+
+
+    @action("muldelete", "删除", "确定删除所选记录?", "fa-trash", single=False)
+    # @pysnooper.snoop()
+    def muldelete(self, items):
+        if not items:
+            abort(404)
+        success = []
+        fail = []
+        try:
+            for item in items:
+                try:
+                    if not g.user.is_admin() and g.user.username != item.created_by.username:
+                        flash('no permission to delete', 'error')
+                        success = []
+                        fail.append(item.to_json())
+                        break
+                    self.pre_delete(item)
+                    db.session.delete(item)
+                    success.append(item.to_json())
+                except Exception as e:
+                    flash(str(e), "danger")
+                    fail.append(item.to_json())
+            db.session.commit()
+        except Exception as e:
+            # 捕获其他未预见的异常
+            db.session.rollback()
+            fail.append('error')
+            success = []
+        # finally:
+        #     db.session.remove()
+        return json.dumps(
+            {
+                "success": success,
+                "fail": fail
+            }, indent=4, ensure_ascii=False
+        )
 
 
 

@@ -16,7 +16,7 @@ from myapp.forms import MyBS3TextAreaFieldWidget, MySelect2Widget, MyCommaSepara
 from flask import jsonify, Markup, make_response
 from requests.exceptions import ConnectionError
 from .baseApi import MyappModelRestApi
-from flask import g, request, redirect
+from flask import g, request, redirect, abort, flash
 import json, os, sys
 from werkzeug.utils import secure_filename
 import pysnooper
@@ -37,6 +37,7 @@ from myapp.views.view_team import Project_Join_Filter
 from myapp.models.model_dataset import Dataset
 import requests
 from myapp.utils import core
+from myapp.exceptions import MyappException
 
 conf = app.config
 
@@ -408,11 +409,52 @@ class Dataset_ModelView_base():
     def post_update(self, item):
         return self.sync_label_studio(item, 'M')
 
+    @pysnooper.snoop()
     def check_edit_permission(self, item):
-        if not g.user.is_admin() and g.user.username != item.created_by.username and g.user.username not in item.owner:
+        owners = item.owner
+        if not g.user.is_admin() and g.user.username != item.created_by.username \
+            and g.user.username not in item.owner and item.owner is not "*" :
             return False
         return True
     check_delete_permission = check_edit_permission
+
+    @action("muldelete", "删除", "确定删除所选记录?", "fa-trash", single=False)
+    # @pysnooper.snoop()
+    def muldelete(self, items):
+        if not items:
+            abort(404)
+        success = []
+        fail = []
+        try:
+            for item in items:
+                try:
+                    if not g.user.is_admin() and g.user.username != item.created_by.username \
+                        and g.user.username not in item.owner and item.owner is not "*" :
+                        flash('no permission to delete', 'error')
+                        success = []
+                        fail.append(item.to_json())
+                        break
+                    self.pre_delete(item)
+                    db.session.delete(item)
+                    success.append(item.to_json())
+                except Exception as e:
+
+                    flash(str(e), "danger")
+                    fail.append(item.to_json())
+            db.session.commit()
+        except Exception as e:
+            # 捕获其他未预见的异常
+            db.session.rollback()
+            fail.append('error')
+            success = []
+        # finally:
+        #     db.session.remove()
+        return json.dumps(
+            {
+                "success": success,
+                "fail": fail
+            }, indent=4, ensure_ascii=False
+        )
 
     # 将外部存储保存到本地存储中心
     @action("save_store", "备份", "备份数据到当前集群?", "fa-trash", single=True, multiple=False)

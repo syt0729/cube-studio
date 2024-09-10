@@ -17,7 +17,8 @@ from flask import (
     flash,
     g,
     redirect,
-    request
+    request,
+    abort
 )
 from .base import (
     DeleteMixin,
@@ -30,6 +31,7 @@ from .baseApi import (
 )
 from myapp.views.view_team import Project_Join_Filter, filter_join_org_project
 from flask_appbuilder import expose
+from flask_appbuilder.actions import action
 import json
 
 conf = app.config
@@ -126,6 +128,52 @@ class Service_ModelView_base():
     def pre_delete(self, item):
         self.delete_old_service(item.name, item.project.cluster)
         flash(__('服务清理完成'), category='success')
+
+    # 检测是否具有编辑权限，只有creator和admin可以编辑
+    def check_edit_permission(self, item):
+        if g.user.is_admin():
+            return True
+        if g.user and g.user.username and hasattr(item, 'created_by'):
+            if g.user.username == item.created_by.username:
+                return True
+        return False
+    check_delete_permission = check_edit_permission
+
+    @action("muldelete", "删除", "确定删除所选记录?", "fa-trash", single=False)
+    # @pysnooper.snoop()
+    def muldelete(self, items):
+        if not items:
+            abort(404)
+        success = []
+        fail = []
+        try:
+            for item in items:
+                try:
+                    if not self.check_delete_permission(item):
+                        flash('no permission to delete', 'error')
+                        success = []
+                        fail.append(item.to_json())
+                        break
+                    self.pre_delete(item)
+                    db.session.delete(item)
+                    success.append(item.to_json())
+                except Exception as e:
+                    flash(str(e), "danger")
+                    fail.append(item.to_json())
+            db.session.commit()
+        except Exception as e:
+            # 捕获其他未预见的异常
+            db.session.rollback()
+            fail.append('error')
+            success = []
+        # finally:
+        #     db.session.remove()
+        return json.dumps(
+            {
+                "success": success,
+                "fail": fail
+            }, indent=4, ensure_ascii=False
+        )
 
     @expose('/clear/<service_id>', methods=['POST', "GET"])
     def clear(self, service_id):

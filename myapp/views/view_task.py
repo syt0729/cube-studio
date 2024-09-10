@@ -26,7 +26,8 @@ import logging
 from flask import (
     flash,
     g,
-    redirect
+    redirect,
+    abort
 )
 from .base import (
     get_user_roles,
@@ -34,6 +35,7 @@ from .base import (
 )
 from myapp.views.base import CompactCRUDMixin
 from flask_appbuilder import expose
+from flask_appbuilder.actions import action
 import datetime, time, json
 
 conf = app.config
@@ -191,6 +193,7 @@ class Task_ModelView_Base():
                 return True
         flash('just creator can edit/delete ', 'warning')
         return False
+    check_delete_permission = check_edit_permission
 
     # 验证args参数
     # @pysnooper.snoop(watch_explode=('item'))
@@ -554,6 +557,42 @@ class Task_ModelView_Base():
                                     accounts=task.job_template.accounts, username=task.pipeline.created_by.username,
                                     hostPort=[hostPort+1,hostPort+2] if HostNetwork else []
                                     )
+
+    @action("muldelete", "删除", "确定删除所选记录?", "fa-trash", single=False)
+    # @pysnooper.snoop()
+    def muldelete(self, items):
+        if not items:
+            abort(404)
+        success = []
+        fail = []
+        try:
+            for item in items:
+                try:
+                    if not self.check_delete_permission(item):
+                        flash('no permission to delete', 'error')
+                        success = []
+                        fail.append(item.to_json())
+                        break
+                    self.pre_delete(item)
+                    db.session.delete(item)
+                    success.append(item.to_json())
+                except Exception as e:
+                    flash(str(e), "danger")
+                    fail.append(item.to_json())
+            db.session.commit()
+        except Exception as e:
+            # 捕获其他未预见的异常
+            db.session.rollback()
+            fail.append('error')
+            success = []
+        # finally:
+        #     db.session.remove()
+        return json.dumps(
+            {
+                "success": success,
+                "fail": fail
+            }, indent=4, ensure_ascii=False
+        )
 
     # @event_logger.log_this
     @expose("/debug/<task_id>", methods=["GET", "POST"])
