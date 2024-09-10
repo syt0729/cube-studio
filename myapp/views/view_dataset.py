@@ -323,6 +323,7 @@ class Dataset_ModelView_base():
             item.subdataset = item.name
         item.features = json.dumps(json.loads(item.features),indent=4,ensure_ascii=False) if item.features else "{}"
 
+    @pysnooper.snoop()
     def post_add(self, item):
         return self.sync_label_studio(item)
     @pysnooper.snoop()
@@ -379,15 +380,15 @@ class Dataset_ModelView_base():
                 if response.status_code == 404:
                     mes = response.json().get('type',None)
                     if mes == 'project':
-                        return self.response_error(421, message='当前数据集未同步到Label Studio')
+                        return self.response_error(400, message='当前数据集未同步到Label Studio')
                     else:
-                        return self.response_error(421, message='存在账号未同步到Label Studio')
+                        return self.response_error(400, message='存在账号未同步到Label Studio')
                 if response.status_code == 500:
-                    return self.response_error(421, message="Label Studio 内部有错, 请联系管理员 ")
+                    return self.response_error(400, message="Label Studio 内部有错, 请联系管理员 ")
             except ConnectionError as e:
-                return self.response_error(421, message="Label Studio 服务可能没开启")
+                return self.response_error(400, message="Label Studio 服务可能没开启")
             except Exception as e:
-                return self.response_error(421, message="Label Studio 服务不可用")
+                return self.response_error(400, message="Label Studio 服务不可用")
 
             if OpType == "CR":
                 rs = response.json()
