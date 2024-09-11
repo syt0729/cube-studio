@@ -2,6 +2,7 @@ from urllib.parse import urlencode
 from flask_login import current_user
 import logging
 import jwt
+from flask import jsonify
 
 from flask_babel import lazy_gettext
 import pysnooper
@@ -78,7 +79,7 @@ PermissionModelView.list_widget = MyappSecurityListWidget
 
 # expand user
 from flask_appbuilder.security.sqla.models import User,Role
-from sqlalchemy import Column, String
+from sqlalchemy import Column, String,Integer
 
 
 
@@ -88,6 +89,7 @@ class MyUser(User):
     quota = Column(String(2000))  # 资源配额
     ls_token =  Column(String(2000))  # label studio api Token
 
+    ls_user_id = Column(Integer)
     def get_full_name(self):
         return self.username
 
@@ -225,11 +227,14 @@ class MyUserRemoteUserModelView_Base():
         }
         response = requests.post(ls_domain+"/user/externalSignup/", data=urlencode(payload), headers=headers)
         rs = response.json()
-        return rs.get('token',None)
+        return rs
 
-    def update_ls_token(self, token, user):
+    def update_ls_info(self, data, user):
+        token = data.get('token',None)
+        ls_user_id = data.get('ls_user_id',None)
         from myapp import security_manager
         user.ls_token = "Token "+token
+        user.ls_user_id = ls_user_id
         security_manager.update_user(user)
 
     # 添加默认gamma角色
@@ -258,23 +263,14 @@ class MyUserRemoteUserModelView_Base():
         ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
         # 每次登录都重新获取ls_token值
         if not password=='':
-            token = self.signup_labelStudio(user.email, password, ls_domain)
+            rs = self.signup_labelStudio(user.email, password, ls_domain)
         else:
-            token = self.signup_labelStudio(user.email, user.password, ls_domain)
-        self.update_ls_token(token,user)
+            rs = self.signup_labelStudio(user.email, user.password, ls_domain)
+        self.update_ls_info(rs,user)
 
     @pysnooper.snoop(watch=('user'))
     def post_delete(self,user):
-        from myapp import app
-        conf = app.config
-        ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
-        user.ls_token
-        headers = {
-            'content-type':'application/x-www-form-urlencoded',
-            'Accept': 'application/json',
-            'Authorization': g.user.ls_token
-        }
-        requests.delete(ls_domain+"/api/users/delete-by-email/?email="+user.email, headers=headers)
+        sync_user_update(user.email, user.password,'D')
 
 
 class MyUserRemoteUserModelView(MyUserRemoteUserModelView_Base,UserModelView):
@@ -343,13 +339,42 @@ class UserInfoEditView(SimpleFormView):
             form_field = getattr(form, key)
             form_field.data = getattr(item, key)
 
+    @pysnooper.snoop(watch=('form'))
     def form_post(self, form):
         form = self.form.refresh(request.form)
         item = self.appbuilder.sm.get_user_by_id(g.user.id)
         form.populate_obj(item)
         self.appbuilder.sm.update_user(item)
         flash(as_unicode(self.message), "info")
+        email = item.email
+        password = item.password
+        sync_user_update(email, password)
 
+@pysnooper.snoop(watch=('form'))
+def sync_user_update(email, password, type="M"):
+    from myapp import app
+    conf = app.config
+    ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
+    headers = {
+        'content-type':'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'Authorization': g.user.ls_token
+    }
+    payload = {
+            'email':  email,
+            'password': password
+    }
+    try:
+        if type == 'M':
+            requests.post(ls_domain+"/api/modify-or-delete/", data=urlencode(payload), headers=headers)
+        else:
+            requests.delete(ls_domain+"/api/users/delete-by-email/?email="+email, headers=headers)
+    except Exception as e:
+        return jsonify({
+                "status": 400,
+                "message": 'Label Studio 服务不可用',
+                "result": {}
+            })
 
 
 from myapp.project import MyCustomRemoteUserView

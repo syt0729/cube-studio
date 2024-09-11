@@ -32,7 +32,27 @@ def logout_labelStudio(ls_domain):
         'Accept': 'application/json',
         'Authorization': ls_token
     }
-    requests.post(ls_domain+"/user/external_logout/", headers=headers)
+    try:
+        response = requests.post(ls_domain+"/user/external_logout/", headers=headers)
+        if response.status_code == 500:
+            return jsonify({
+                    "status": 400,
+                    "message": 'Label Studio 内部有错, 请联系管理员',
+                    "result": {}
+                })
+    except ConnectionError as e:
+        return jsonify({
+                    "status": 400,
+                    "message": 'Label Studio 服务可能没开启',
+                    "result": {}
+                })
+    except Exception as e:
+        return jsonify({
+                    "status": 400,
+                    "message": 'Label Studio 服务不可用',
+                    "result": {}
+                })
+
 
 # 账号密码登录方式的登录界面
 class Myauthdbview(AuthDBView):
@@ -144,7 +164,7 @@ class Myauthdbview(AuthDBView):
         from myapp import app
         conf = app.config
         ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
-        logout_labelStudio(ls_domain)
+        res = logout_labelStudio(ls_domain)
         login_url = request.host_url.strip('/') + '/login/'
         session.pop('user', None)
         g.user = None
