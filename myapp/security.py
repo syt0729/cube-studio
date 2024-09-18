@@ -229,6 +229,7 @@ class MyUserRemoteUserModelView_Base():
         rs = response.json()
         return rs
 
+    @pysnooper.snoop(prefix="update_ls_info here.............: ")
     def update_ls_info(self, data, user):
         token = data.get('token',None)
         ls_user_id = data.get('ls_user_id',None)
@@ -270,8 +271,11 @@ class MyUserRemoteUserModelView_Base():
 
     @pysnooper.snoop(watch=('user'))
     def post_delete(self,user):
-        sync_user_update(user.email, user.password,'D')
-
+        sync_user_update(user,'D')
+    # 添加默认gamma角色
+    @pysnooper.snoop(prefix="post_update here.............: ")
+    def post_update(self,user):
+        sync_user_update(user,'M')
 
 class MyUserRemoteUserModelView(MyUserRemoteUserModelView_Base,UserModelView):
     datamodel = SQLAInterface(MyUser)
@@ -339,7 +343,7 @@ class UserInfoEditView(SimpleFormView):
             form_field = getattr(form, key)
             form_field.data = getattr(item, key)
 
-    @pysnooper.snoop(watch=('form'))
+    @pysnooper.snoop(prefix="form_post here.............: ")
     def form_post(self, form):
         form = self.form.refresh(request.form)
         item = self.appbuilder.sm.get_user_by_id(g.user.id)
@@ -350,8 +354,8 @@ class UserInfoEditView(SimpleFormView):
         password = item.password
         sync_user_update(email, password)
 
-@pysnooper.snoop(watch=('form'))
-def sync_user_update(email, password, type="M"):
+@pysnooper.snoop(watch=('payload'))
+def sync_user_update(user, type="M"):
     from myapp import app
     conf = app.config
     ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
@@ -361,14 +365,15 @@ def sync_user_update(email, password, type="M"):
         'Authorization': g.user.ls_token
     }
     payload = {
-            'email':  email,
-            'password': password
+            'email':  user.email,
+            'password': user.password,
+            'id': user.ls_user_id
     }
     try:
         if type == 'M':
             requests.post(ls_domain+"/api/modify-or-delete/", data=urlencode(payload), headers=headers)
         else:
-            requests.delete(ls_domain+"/api/users/delete-by-email/?email="+email, headers=headers)
+            requests.delete(ls_domain+"/api/users/delete-by-email/?email="+user.email, headers=headers)
     except Exception as e:
         return jsonify({
                 "status": 400,
