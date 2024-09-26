@@ -241,8 +241,10 @@ class MyUserRemoteUserModelView_Base():
         try:
             rs = signup_labelStudio(user.email, user.password)
             store_ls_info(rs,user)
+        except ConnectionError as e:
+            abort(400, description='标注平台不可用，无法进行此操作')
         except Exception as e:
-            abort(400, description='标注平台不可用，无法新增')
+            abort(400, description='标注平台报错，可能由脏数据引起')
 
     @pysnooper.snoop(watch=('user'))
     def pre_delete(self,user):
@@ -349,11 +351,10 @@ def sync_user_update(user, type="M"):
             requests.post(ls_domain+"/api/modify-or-delete/", data=urlencode(payload), headers=headers)
         else:
             requests.delete(ls_domain+"/api/users/delete-by-email/?email="+user.email, headers=headers)
+    except ConnectionError as e:
+            abort(400, description='标注平台不可用，无法进行此操作')
     except Exception as e:
-        if type == 'M':
-            abort(400, description='标注平台不可用，暂时无法修改用户信息')
-        else:
-            abort(404, description='标注平台不可用，暂时无法删除用户')
+            abort(400, description='标注平台报错，可能由脏数据引起')
 
 
 # 标注平台注册新用户，并获取用户token

@@ -312,6 +312,8 @@ class Dataset_ModelView_base():
     def pre_add(self, item):
         self.modifyItem(item)
         self.sync_label_studio(item)
+    def post_add(self, item):
+        self.sync_label_studio(item)
 
     def modifyItem(self, item):
         if not item.owner:
@@ -378,8 +380,16 @@ class Dataset_ModelView_base():
             ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
             try:
                 response = requests.post(ls_domain+"/api/projects/sync-dataset", data=urlencode(payload), headers=headers)
-            except Exception as e:
+                if response.status_code == 404:
+                    mes = response.json().get('type',None)
+                    if mes == 'CR':
+                        return
+                    else:
+                        return abort(400, description='标注平台报错，可能由脏数据引起')
+            except ConnectionError as e:
                 abort(400, description='标注平台不可用，无法进行此操作')
+            except Exception as e:
+                abort(400, description='标注平台报错，可能由脏数据引起')
 
             if OpType == "CR":
                 rs = response.json()
