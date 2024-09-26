@@ -86,7 +86,7 @@ class Myauthdbview(AuthDBView):
                     "result": {}
                 })
 
-    #@pysnooper.snoop(prefix="login here.............: ")
+    @pysnooper.snoop(prefix="login here.............: ")
     @expose("/login/", methods=["GET", "POST"])
     def login(self):
         request_data = request.args.to_dict()
@@ -144,15 +144,20 @@ class Myauthdbview(AuthDBView):
 
                     return redirect(self.appbuilder.get_url_for_login)
                 else:
-                    # 没有用户的时候自动注册用户
-                    user = self.appbuilder.sm.auth_user_remote_org_user(username=form.username.data, org_name='',
-                                                                        password=form.password.data)
+                    try:
+                        # 没有用户的时候自动注册用户
+                        user = self.appbuilder.sm.auth_user_remote_org_user(username=form.username.data, org_name='',
+                                                                            password=form.password.data)
+                    except Exception as e:
+                        login_url = request.host_url.strip('/') + '/login/'
+                        flash('Label Studio 服务不可用，无法注册', "warning")
+                        return redirect(login_url)
                     flash('发现用户%s不存在，已自动注册' % form.username.data, "warning")
             login_user(user, remember=True)
             # 添加到public项目组
             from myapp.security import MyUserRemoteUserModelView_Base
             user_view = MyUserRemoteUserModelView_Base()
-            user_view.post_add(user, password)
+            user_view.post_add(user)
             return redirect(comed_url if comed_url else self.appbuilder.get_url_for_index)
         return self.render_template(
             self.login_template, title=self.title, form=form, appbuilder=self.appbuilder
