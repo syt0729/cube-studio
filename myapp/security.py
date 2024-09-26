@@ -87,7 +87,7 @@ class MyUser(User):
     __tablename__ = 'ab_user'
     org = Column(String(200))   # Organization
     quota = Column(String(2000))  # 资源配额
-    ls_token =  Column(String(2000))  # label studio api Token
+    ls_token =  Column(String(2000))  # 标注平台 api Token
 
     ls_user_id = Column(Integer)
     def get_full_name(self):
@@ -242,12 +242,7 @@ class MyUserRemoteUserModelView_Base():
             rs = signup_labelStudio(user.email, user.password)
             store_ls_info(rs,user)
         except Exception as e:
-            abort(400, description='Label Studio 服务不可用，无法新增')
-            # return jsonify({
-            #         "status": 400,
-            #         "message": 'Label Studio 服务不可用',
-            #         "result": {}
-            #     })
+            abort(400, description='标注平台不可用，无法新增')
 
     @pysnooper.snoop(watch=('user'))
     def pre_delete(self,user):
@@ -356,12 +351,12 @@ def sync_user_update(user, type="M"):
             requests.delete(ls_domain+"/api/users/delete-by-email/?email="+user.email, headers=headers)
     except Exception as e:
         if type == 'M':
-            abort(400, description='Label Studio 服务不可用，暂时无法修改用户信息')
+            abort(400, description='标注平台不可用，暂时无法修改用户信息')
         else:
-            abort(404, description='Label Studio 服务不可用，暂时无法删除用户')
+            abort(404, description='标注平台不可用，暂时无法删除用户')
 
 
-# label studio注册新用户，并获取用户token
+# 标注平台注册新用户，并获取用户token
 @pysnooper.snoop(prefix="signup_labelStudio here.............: ")
 def signup_labelStudio(email,password):
     from myapp import app
@@ -383,7 +378,7 @@ def signup_labelStudio(email,password):
     # except Exception as e:
     #     return jsonify({
     #             "status": 400,
-    #             "message": 'Label Studio 服务不可用',
+    #             "message": '标注平台不可用',
     #             "result": {}
     #         })
 

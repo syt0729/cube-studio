@@ -310,6 +310,10 @@ class Dataset_ModelView_base():
     download_data = True
 
     def pre_add(self, item):
+        self.modifyItem(item)
+        self.sync_label_studio(item)
+
+    def modifyItem(self, item):
         if not item.owner:
             item.owner = g.user.username + ",*"
         if not item.icon:
@@ -324,11 +328,8 @@ class Dataset_ModelView_base():
         item.features = json.dumps(json.loads(item.features),indent=4,ensure_ascii=False) if item.features else "{}"
 
     @pysnooper.snoop()
-    def post_add(self, item):
-        return self.sync_label_studio(item)
-    @pysnooper.snoop()
-    def post_delete(self, item):
-        return self.sync_label_studio(item, 'D')
+    def pre_delete(self, item):
+        self.sync_label_studio(item, 'D')
 
     # @pysnooper.snoop()
     def _merge_project_users(self, item):
@@ -377,18 +378,8 @@ class Dataset_ModelView_base():
             ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
             try:
                 response = requests.post(ls_domain+"/api/projects/sync-dataset", data=urlencode(payload), headers=headers)
-                if response.status_code == 404:
-                    mes = response.json().get('type',None)
-                    if mes == 'project':
-                        return self.response_error(400, message='当前数据集未同步到Label Studio')
-                    else:
-                        return self.response_error(400, message='存在账号未同步到Label Studio')
-                if response.status_code == 500:
-                    return self.response_error(400, message="Label Studio 内部有错, 请联系管理员 ")
-            except ConnectionError as e:
-                return self.response_error(400, message="Label Studio 服务可能没开启")
             except Exception as e:
-                return self.response_error(400, message="Label Studio 服务不可用")
+                abort(400, description='标注平台不可用，无法进行此操作')
 
             if OpType == "CR":
                 rs = response.json()
@@ -405,10 +396,8 @@ class Dataset_ModelView_base():
                         print(f"No dataset found with id {item.id}")
 
     def pre_update(self, item):
-        self.pre_add(item)
-
-    def post_update(self, item):
-        return self.sync_label_studio(item, 'M')
+        self.modifyItem(item)
+        self.sync_label_studio(item, 'M')
 
     @pysnooper.snoop()
     def check_edit_permission(self, item):
