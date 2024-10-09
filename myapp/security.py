@@ -40,7 +40,14 @@ from flask_appbuilder.const import (
     LOGMSG_WAR_SEC_LOGIN_FAILED
 )
 
+from flask_appbuilder.security.views import SimpleFormView
+from flask_appbuilder._compat import as_unicode
+from flask_babel import lazy_gettext
+from wtforms import StringField
+from wtforms.validators import DataRequired
 
+from flask_appbuilder.fieldwidgets import BS3TextFieldWidget
+from flask_appbuilder.forms import DynamicForm
 
 
 # user list page template
@@ -197,7 +204,15 @@ class MyUserRemoteUserModelView_Base():
             {"fields": ["first_name", "last_name", "email",'org','quota'], "expanded": True},
         ),
     ]
-
+    add_form_extra_fields = {
+        "password": StringField(
+            lazy_gettext("Password"),
+            validators=[DataRequired()],
+            widget=BS3TextFieldWidget(),
+            description=lazy_gettext("Password"),
+        )
+    }
+    edit_form_extra_fields = add_form_extra_fields
 
     @expose("/userinfo/")
     @has_access
@@ -256,16 +271,6 @@ class MyUserRemoteUserModelView_Base():
 
 class MyUserRemoteUserModelView(MyUserRemoteUserModelView_Base,UserModelView):
     datamodel = SQLAInterface(MyUser)
-
-from flask_appbuilder.security.views import SimpleFormView
-from flask_appbuilder._compat import as_unicode
-from flask_babel import lazy_gettext
-from wtforms import StringField
-from wtforms.validators import DataRequired
-
-from flask_appbuilder.fieldwidgets import BS3TextFieldWidget
-from flask_appbuilder.forms import DynamicForm
-
 
 class UserInfoEditView(SimpleFormView):
 
