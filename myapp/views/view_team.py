@@ -332,6 +332,7 @@ class Project_ModelView_Base():
         "project_user":{"type": "ellip2", "width": 700},
         "job_template": {"type": "ellip2", "width": 700},
         "type": {"type": "ellip1", "width": 200},
+        "describe": {"type": "ellip1", "width": 300},
     }
 
     add_columns = ['name', 'describe', 'expand'] # 'cluster','volume_mount','service_external_ip',
@@ -526,7 +527,7 @@ class Project_ModelView_org_Api(Project_ModelView_Base, MyappModelRestApi):
     datamodel = SQLAInterface(Project)
     project_type = 'org'
     base_filters = [["id", Project_Join_Filter, project_type]]
-    list_columns = ['name', 'project_user', 'type']
+    list_columns = ['name', 'describe', 'project_user']
     related_views = [Project_User_ModelView_Api, ]
     label_title = _('项目分组')
     edit_form_extra_fields = {
