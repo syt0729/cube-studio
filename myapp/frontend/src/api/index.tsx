@@ -150,7 +150,7 @@ axios.interceptors.response.use(
                 handleTips.gotoLogin();
             } else if (error.response.status === 400) {
                 handleTips.trigger(errMsg);
-                return Promise.resolve(error);
+                return Promise.reject(error);
             } else if (error.response.status !== 422) {
                 handleTips.trigger(errMsg);
             }

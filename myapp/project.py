@@ -32,7 +32,27 @@ def logout_labelStudio(ls_domain):
         'Accept': 'application/json',
         'Authorization': ls_token
     }
-    requests.post(ls_domain+"/user/external_logout/", headers=headers)
+    try:
+        response = requests.post(ls_domain+"/user/external_logout/", headers=headers)
+        if response.status_code == 500:
+            return jsonify({
+                    "status": 400,
+                    "message": 'Label Studio 内部有错, 请联系管理员',
+                    "result": {}
+                })
+    except ConnectionError as e:
+        return jsonify({
+                    "status": 400,
+                    "message": 'Label Studio 服务可能没开启',
+                    "result": {}
+                })
+    except Exception as e:
+        return jsonify({
+                    "status": 400,
+                    "message": 'Label Studio 服务不可用',
+                    "result": {}
+                })
+
 
 # 账号密码登录方式的登录界面
 class Myauthdbview(AuthDBView):
@@ -66,7 +86,7 @@ class Myauthdbview(AuthDBView):
                     "result": {}
                 })
 
-    #@pysnooper.snoop(prefix="login here.............: ")
+    @pysnooper.snoop(prefix="login here.............: ")
     @expose("/login/", methods=["GET", "POST"])
     def login(self):
         request_data = request.args.to_dict()
@@ -124,15 +144,20 @@ class Myauthdbview(AuthDBView):
 
                     return redirect(self.appbuilder.get_url_for_login)
                 else:
-                    # 没有用户的时候自动注册用户
-                    user = self.appbuilder.sm.auth_user_remote_org_user(username=form.username.data, org_name='',
-                                                                        password=form.password.data)
+                    try:
+                        # 没有用户的时候自动注册用户
+                        user = self.appbuilder.sm.auth_user_remote_org_user(username=form.username.data, org_name='',
+                                                                            password=form.password.data)
+                    except Exception as e:
+                        login_url = request.host_url.strip('/') + '/login/'
+                        flash('Label Studio 服务不可用，无法注册', "warning")
+                        return redirect(login_url)
                     flash('发现用户%s不存在，已自动注册' % form.username.data, "warning")
             login_user(user, remember=True)
             # 添加到public项目组
             from myapp.security import MyUserRemoteUserModelView_Base
             user_view = MyUserRemoteUserModelView_Base()
-            user_view.post_add(user, password)
+            user_view.post_add(user)
             return redirect(comed_url if comed_url else self.appbuilder.get_url_for_index)
         return self.render_template(
             self.login_template, title=self.title, form=form, appbuilder=self.appbuilder
@@ -144,7 +169,7 @@ class Myauthdbview(AuthDBView):
         from myapp import app
         conf = app.config
         ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
-        logout_labelStudio(ls_domain)
+        res = logout_labelStudio(ls_domain)
         login_url = request.host_url.strip('/') + '/login/'
         session.pop('user', None)
         g.user = None

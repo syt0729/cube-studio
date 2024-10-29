@@ -1,6 +1,9 @@
 import re
+from urllib.parse import urlencode
 
-from myapp.security import MyUser
+import requests
+
+from myapp.security import MyUser, signup_labelStudio
 from flask import flash, g, request
 from myapp.views.baseSQLA import MyappSQLAInterface as SQLAInterface
 from flask_babel import gettext as __
@@ -18,6 +21,7 @@ from wtforms.validators import DataRequired
 from flask_appbuilder.fieldwidgets import Select2ManyWidget
 from wtforms.ext.sqlalchemy.fields import QuerySelectMultipleField
 from sqlalchemy.exc import IntegrityError
+from myapp.models.model_dataset import Dataset
 from flask import (
     flash,
     g,
@@ -168,7 +172,7 @@ class Project_User_ModelView_Base():
         return False
 
     @action("muldelete", "删除", "确定删除所选记录?", "fa-trash", single=False)
-    # @pysnooper.snoop(prefix='team_muldel')
+    @pysnooper.snoop(prefix='team_muldel')
     def muldelete(self, items):
         if not items or not items[0]:
             abort(404)
@@ -192,6 +196,7 @@ class Project_User_ModelView_Base():
                     flash(str(e), "danger")
                     fail.append(item.to_json())
             db.session.commit()
+            self.post_delete(items[0])
         except Exception as e:
             # 捕获其他未预见的异常
             db.session.rollback()
@@ -208,6 +213,15 @@ class Project_User_ModelView_Base():
 
     pre_update_req=pre_add_req
 
+    @pysnooper.snoop(prefix='pre_delete')
+    def pre_delete(self, item):
+        self.try_ls_available(item.project_id)
+        self.project_id = item.project_id
+
+    def post_delete(self, item):
+        self.handle_dataset(self.project_id)
+        del self.project_id
+
     @expose("/", methods=["POST"])
     @pysnooper.snoop(watch_explode=('items', 'json_data','json_data_list'))
     def api_add(self):
@@ -223,7 +237,7 @@ class Project_User_ModelView_Base():
                 json_data['project'] = json_data["filter_id"]
                 del json_data["filter_id"]
 
-
+            self.pre_add(json_data['project'])
             if self.pre_add_req:
                 json_data_temp = self.pre_add_req(req_json=json_data)
                 if json_data_temp:
@@ -258,7 +272,7 @@ class Project_User_ModelView_Base():
         try:
             for item in items:
                 self.datamodel.add(item, raise_exception=True)
-
+            self.post_add(json_data['project'])
             result_data = [self.add_model_schema.dump(item, many=False) for item in items]
             for res_data, item in zip(result_data, items):
                 res_data[self.primary_key] = self.datamodel.get_pk_value(item)
@@ -276,6 +290,66 @@ class Project_User_ModelView_Base():
             return self.response_error(422, message=str(e.orig))
         except Exception as e1:
             return self.response_error(500, message=str(e1))
+
+    @pysnooper.snoop(watch_explode=('project_id', 'datasets'))
+    def try_ls_available(self,project_id):
+        try:
+            datasets = db.session.query(Dataset).filter(Dataset.project_id == project_id).all()
+            if not datasets:
+                return True
+            res = signup_labelStudio(g.user.email, g.user.password)
+            return True
+        except ConnectionError as e:
+            abort(400, description='标注平台不可用，无法进行此操作')
+        except Exception as e:
+            abort(400, description='标注平台报错，可能由脏数据引起')
+
+    def post_add(self, project_id):
+       self.handle_dataset(project_id)
+
+
+    def handle_dataset(self, project_id):
+        datasets = db.session.query(Dataset).filter(Dataset.project_id == project_id).all()
+        # 遍历每一条记录并进行处理
+        for dataset in datasets:
+            payload = {
+                    'name': dataset.name,
+                    'id': dataset.id ,
+                    'OpType': 'M',
+                    'description': dataset.describe
+                }
+            if dataset.owner == '*':
+                payload['owner'] = '*'
+            if dataset.project and dataset.project.id:
+                project_users = db.session.query(MyUser.username).join(Project_User, Project_User.user_id == MyUser.id).filter(Project_User.project_id == dataset.project.id).all()
+                project_usernames = [user.username for user in project_users]
+                # 将 owner 和 project_usernames 合并并去重
+                owner_usernames = set(dataset.owner.split(','))
+                combined_usernames = owner_usernames.union(project_usernames)
+                full_owner = ",".join(combined_usernames)
+                payload['owner'] =  full_owner
+                ls_token = g.user.ls_token
+                headers = {
+                    'content-type':'application/x-www-form-urlencoded',
+                    'Accept': 'application/json',
+                    'Authorization': ls_token
+                }
+                ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
+                try:
+                    response = requests.post(ls_domain+"/api/projects/sync-dataset", data=urlencode(payload), headers=headers)
+                    if response.status_code == 404:
+                        mes = response.json().get('type',None)
+                        if mes == 'CR':
+                            return
+                        else:
+                            return abort(400, description='标注平台报错，可能由脏数据引起')
+                except ConnectionError as e:
+                    abort(400, description='标注平台不可用，无法进行此操作')
+                except Exception as e:
+                    abort(400, description='标注平台报错，可能由脏数据引起')
+
+    def pre_add(self, project_id):
+        self.try_ls_available(project_id)
 
 class Project_User_ModelView(Project_User_ModelView_Base, CompactCRUDMixin, MyappModelView):
     datamodel = SQLAInterface(Project_User)

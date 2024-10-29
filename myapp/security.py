@@ -2,7 +2,7 @@ from urllib.parse import urlencode
 from flask_login import current_user
 import logging
 import jwt
-from flask import jsonify
+from flask import abort, jsonify
 
 from flask_babel import lazy_gettext
 import pysnooper
@@ -40,7 +40,14 @@ from flask_appbuilder.const import (
     LOGMSG_WAR_SEC_LOGIN_FAILED
 )
 
+from flask_appbuilder.security.views import SimpleFormView
+from flask_appbuilder._compat import as_unicode
+from flask_babel import lazy_gettext
+from wtforms import StringField
+from wtforms.validators import DataRequired
 
+from flask_appbuilder.fieldwidgets import BS3TextFieldWidget
+from flask_appbuilder.forms import DynamicForm
 
 
 # user list page template
@@ -79,7 +86,7 @@ PermissionModelView.list_widget = MyappSecurityListWidget
 
 # expand user
 from flask_appbuilder.security.sqla.models import User,Role
-from sqlalchemy import Column, String,Integer
+from sqlalchemy import Column, String,Integer,Boolean
 
 
 
@@ -87,7 +94,7 @@ class MyUser(User):
     __tablename__ = 'ab_user'
     org = Column(String(200))   # Organization
     quota = Column(String(2000))  # 资源配额
-    ls_token =  Column(String(2000))  # label studio api Token
+    ls_token =  Column(String(2000))  # 标注平台 api Token
 
     ls_user_id = Column(Integer)
     def get_full_name(self):
@@ -197,7 +204,15 @@ class MyUserRemoteUserModelView_Base():
             {"fields": ["first_name", "last_name", "email",'org','quota'], "expanded": True},
         ),
     ]
-
+    add_form_extra_fields = {
+        "password": StringField(
+            lazy_gettext("Password"),
+            validators=[DataRequired()],
+            widget=BS3TextFieldWidget(),
+            description=lazy_gettext("Password"),
+        )
+    }
+    edit_form_extra_fields = add_form_extra_fields
 
     @expose("/userinfo/")
     @has_access
@@ -214,33 +229,8 @@ class MyUserRemoteUserModelView_Base():
             appbuilder=self.appbuilder,
         )
 
-    # label studio注册新用户，并获取用户token
-    @pysnooper.snoop(prefix="signup_labelStudio here.............: ")
-    def signup_labelStudio(self, email,password,ls_domain):
-        payload = {
-                'email':  email,
-                'password': password
-        }
-        headers = {
-            'content-type':'application/x-www-form-urlencoded',
-            'Accept': 'application/json',
-        }
-        response = requests.post(ls_domain+"/user/externalSignup/", data=urlencode(payload), headers=headers)
-        rs = response.json()
-        return rs
-
-    @pysnooper.snoop(prefix="update_ls_info here.............: ")
-    def update_ls_info(self, data, user):
-        token = data.get('token',None)
-        ls_user_id = data.get('ls_user_id',None)
-        from myapp import security_manager
-        user.ls_token = "Token "+token
-        user.ls_user_id = ls_user_id
-        security_manager.update_user(user)
-
     # 添加默认gamma角色
-    @pysnooper.snoop(watch=('user'))
-    def post_add(self,user, password=''):
+    def post_add(self,user):
         from myapp import security_manager,db, app
         gamma_role = security_manager.find_role('Gamma')
         if gamma_role not in user.roles:
@@ -260,35 +250,27 @@ class MyUserRemoteUserModelView_Base():
                 db.session.commit()
         except Exception:
             db.session.rollback()
-        conf = app.config
-        ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
-        # 每次登录都重新获取ls_token值
-        if not password=='':
-            rs = self.signup_labelStudio(user.email, password, ls_domain)
-        else:
-            rs = self.signup_labelStudio(user.email, user.password, ls_domain)
-        self.update_ls_info(rs,user)
 
     @pysnooper.snoop(watch=('user'))
-    def post_delete(self,user):
+    def pre_add(self,user):
+        try:
+            rs = signup_labelStudio(user.email, user.password)
+            store_ls_info(rs,user)
+        except ConnectionError as e:
+            abort(400, description='标注平台不可用，无法进行此操作')
+        except Exception as e:
+            abort(400, description='标注平台报错，可能由脏数据引起')
+
+    @pysnooper.snoop(watch=('user'))
+    def pre_delete(self,user):
         sync_user_update(user,'D')
     # 添加默认gamma角色
-    @pysnooper.snoop(prefix="post_update here.............: ")
-    def post_update(self,user):
-        sync_user_update(user,'M')
+    @pysnooper.snoop(prefix="pre_update here.............: ")
+    def pre_update(self,user):
+       sync_user_update(user,'M')
 
 class MyUserRemoteUserModelView(MyUserRemoteUserModelView_Base,UserModelView):
     datamodel = SQLAInterface(MyUser)
-
-from flask_appbuilder.security.views import SimpleFormView
-from flask_appbuilder._compat import as_unicode
-from flask_babel import lazy_gettext
-from wtforms import StringField
-from wtforms.validators import DataRequired
-
-from flask_appbuilder.fieldwidgets import BS3TextFieldWidget
-from flask_appbuilder.forms import DynamicForm
-
 
 class UserInfoEditView(SimpleFormView):
 
@@ -352,7 +334,7 @@ class UserInfoEditView(SimpleFormView):
         flash(as_unicode(self.message), "info")
         email = item.email
         password = item.password
-        sync_user_update(email, password)
+        return sync_user_update(email, password)
 
 @pysnooper.snoop(watch=('payload'))
 def sync_user_update(user, type="M"):
@@ -374,13 +356,46 @@ def sync_user_update(user, type="M"):
             requests.post(ls_domain+"/api/modify-or-delete/", data=urlencode(payload), headers=headers)
         else:
             requests.delete(ls_domain+"/api/users/delete-by-email/?email="+user.email, headers=headers)
+    except ConnectionError as e:
+            abort(400, description='标注平台不可用，无法进行此操作')
     except Exception as e:
-        return jsonify({
-                "status": 400,
-                "message": 'Label Studio 服务不可用',
-                "result": {}
-            })
+            abort(400, description='标注平台报错，可能由脏数据引起')
 
+
+# 标注平台注册新用户，并获取用户token
+@pysnooper.snoop(prefix="signup_labelStudio here.............: ")
+def signup_labelStudio(email,password):
+    from myapp import app
+    conf = app.config
+    ls_domain = conf.get('LABEL_STUDIO_DOMAIN_NAME', 'http://192.168.1.249:9002')
+    payload = {
+            'email':  email,
+            'password': password
+    }
+    headers = {
+        'content-type':'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+    }
+    response = requests.post(ls_domain+"/user/externalSignup/", data=urlencode(payload), headers=headers)
+    return response.json()
+    # try:
+    #     response = requests.post(ls_domain+"/user/externalSignup/", data=urlencode(payload), headers=headers)
+    #     return response.json()
+    # except Exception as e:
+    #     return jsonify({
+    #             "status": 400,
+    #             "message": '标注平台不可用',
+    #             "result": {}
+    #         })
+
+@pysnooper.snoop(prefix="store_ls_info here.............: ")
+def store_ls_info(data, user):
+    token = data.get('token',None)
+    ls_user_id = data.get('ls_user_id',None)
+    from myapp import security_manager
+    user.ls_token = "Token "+token
+    user.ls_user_id = ls_user_id
+    security_manager.update_user(user)
 
 from myapp.project import MyCustomRemoteUserView
 from myapp.project import Myauthdbview
@@ -600,7 +615,7 @@ class MyappSecurityManager(SecurityManager):
 
 
     # 添加注册远程用户
-    #@pysnooper.snoop()
+    @pysnooper.snoop()
     def auth_user_remote_org_user(self, username,org_name='',password='',email='',first_name='',last_name=''):
         if not username:
             return None
@@ -612,15 +627,18 @@ class MyappSecurityManager(SecurityManager):
         # rtx_role = self.add_role(username)
         # 如果用户不存在就注册用户
         if user is None:
+            email = username + f"@{conf.get('APP_NAME','cube-studio').replace(' ','').lower()}.com" if not email else email
+            rs = signup_labelStudio(email, password)
             user = self.add_org_user(
                 username=username,
                 first_name=first_name if first_name else username,
                 last_name=last_name if last_name else username,
                 password=password,
                 org=org_name,               # 添加组织架构
-                email=username + f"@{conf.get('APP_NAME','cube-studio').replace(' ','').lower()}.com" if not email else email,
+                email=email,
                 roles=[self.find_role(self.auth_user_registration_role)] if self.find_role(self.auth_user_registration_role) else []  #  org_role   添加gamma默认角色,    组织架构角色先不自动添加
             )
+            store_ls_info(rs,user)
         elif not user.is_active:  # 如果用户未激活不允许接入
             print(LOGMSG_WAR_SEC_LOGIN_FAILED.format(username))
             return None
