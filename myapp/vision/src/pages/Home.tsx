@@ -163,7 +163,7 @@ const Home: React.FC = () => {
       {
         name: t('新人制作一个pipeline'),
         img: '/static/assets/images/ad/video-cover1-thumb.png',
-        url: 'https://cube-studio.oss-cn-hangzhou.aliyuncs.com/cube-studio.mp4',
+        url: '/pipeline-demo.mp4',
         type: 'video',
       }
     ]);

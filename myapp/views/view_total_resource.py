@@ -1,6 +1,6 @@
 import copy
 import math
-from flask import Markup,g
+from flask import Markup,g, has_app_context
 from jinja2 import Environment, BaseLoader, DebugUndefined
 from myapp import app, appbuilder, db
 from flask import request
@@ -25,157 +25,6 @@ node_resource_used = {
     "data": {}
 }
 global_cluster_load = {}
-
-
-# 机器学习首页资源弹窗
-# @pysnooper.snoop()
-def node_traffic():
-    if not node_resource_used['check_time'] or node_resource_used['check_time'] < (datetime.datetime.now() - datetime.timedelta(seconds=10)):
-
-        all_node_json = {}
-        clusters = conf.get('CLUSTERS', {})
-        for cluster_name in clusters:
-            try:
-                cluster = clusters[cluster_name]
-                k8s_client = K8s(cluster.get('KUBECONFIG', ''))
-
-                all_node = k8s_client.get_node()
-                all_node_resource = k8s_client.get_all_node_allocated_resources()
-                all_node_json[cluster_name] = {}
-                for node in all_node:
-                    all_node_json[cluster_name][node['hostip']] = node
-                    node_allocated_resources = all_node_resource.get(node['name'], {
-                        "used_cpu": 0,
-                        "used_memory": 0,
-                        "used_gpu": 0
-                    })
-                    # print(node_allocated_resources)
-                    all_node_json[cluster_name][node['hostip']].update(node_allocated_resources)
-            except Exception as e:
-                print(e)
-
-        node_resource_used['data'] = all_node_json
-        node_resource_used['check_time'] = datetime.datetime.now()
-
-    all_node_json = node_resource_used['data']
-    # print(all_node_json)
-    # 数据格式说明 dict:
-    # 'delay': Integer 延时隐藏 单位: 毫秒 0为不隐藏
-    # 'hit': Boolean 是否命中
-    # 'target': String 当前目标
-    # 'type': String 类型 目前仅支持html类型
-    # 'title': String 标题
-    # 'content': String 内容html内容
-    # /static/appbuilder/mnt/make_pipeline.mp4
-    message = ''
-    td_html = '<td style="border: 1px solid black;padding: 10px">%s</th>'
-    message += "<tr>%s %s %s %s %s %s %s<tr>" % (
-        td_html % __("集群"), td_html % __("资源组"), td_html % __("机器"), td_html % __("机型"), td_html % __("cpu占用率"), td_html % __("内存占用率"),
-        td_html % __("AI加速卡"))
-
-    global global_cluster_load
-    for cluster_name in all_node_json:
-        global_cluster_load[cluster_name] = {
-            "cpu_req": 0,
-            "cpu_all": 0,
-            "mem_req": 0,
-            "mem_all": 0,
-            "gpu_req": 0,
-            "gpu_all": 0
-        }
-        nodes = all_node_json[cluster_name]
-        # nodes = sorted(nodes.items(), key=lambda item: item[1]['labels'].get('org','public'))
-        # ips = [node[0] for node in nodes]
-        # values = [node[1] for node in nodes]
-        # nodes = dict(zip(ips,values))
-
-        # 按项目组和设备类型分组
-        stored_nodes = {}
-        for ip in nodes:
-            org = nodes[ip]['labels'].get('org', 'public')
-            device = 'cpu'
-            if nodes[ip]['labels'].get('gpu','')=='true':
-                device = 'gpu/' + nodes[ip]['labels'].get('gpu-type', '')
-            if nodes[ip]['labels'].get('vgpu', '') == 'true':
-                device = 'vgpu/' + nodes[ip]['labels'].get('gpu-type', '')
-            if org not in stored_nodes:
-                stored_nodes[org] = {}
-            if device not in stored_nodes[org]:
-                stored_nodes[org][device] = {}
-            stored_nodes[org][device][ip] = nodes[ip]
-        nodes = {}
-        for org in stored_nodes:
-            for device in stored_nodes[org]:
-                nodes.update(stored_nodes[org][device])
-
-        cluster_config = conf.get('CLUSTERS', {}).get(cluster_name, {})
-        grafana_url = "//" + cluster_config.get('HOST', request.host) + conf.get('GRAFANA_CLUSTER_PATH')
-        for ip in nodes:
-            node_dashboard_url = "//"+ cluster_config.get('HOST', request.host) + conf.get('K8S_DASHBOARD_CLUSTER') + '#/node/%s?namespace=default' % nodes[ip]['name']
-            org = nodes[ip]['labels'].get('org', 'public')
-            enable_train = nodes[ip]['labels'].get('train', 'true')
-            ip_html = '<a target="_blank" href="%s">%s</a>' % (node_dashboard_url, ip if nodes[ip]['status']=='Ready' else f'<del>{ip}</del>')
-
-            share = nodes[ip]['labels'].get('share', 'true')
-            clolr = "#FFFFFF" if share == 'true' else '#F0F0F0'
-            device = ''
-            if nodes[ip]['labels'].get('cpu','') == 'true':
-                device = 'cpu/'
-            if nodes[ip]['labels'].get('gpu','')=='true':
-                device = device+'gpu/'
-            if nodes[ip]['labels'].get('vgpu','')=='true':
-                device = device+'vgpu/'
-            device = device + nodes[ip]['labels'].get('gpu-type', '')
-            device=device.strip('/')
-
-            gpu_used=0
-            gpu_total=0
-            gpu_mfrs='gpu'
-            gpu_resource = conf.get('GPU_RESOURCE')
-            for gpu_mfrs_temp in gpu_resource:
-                gpu_used_temp = round(nodes[ip].get(f'used_{gpu_mfrs_temp}',0), 2)
-                gpu_total_temp = nodes[ip][gpu_mfrs_temp]
-                if gpu_total_temp>0.01:  # 存在指定卡型资源，就显示指定卡提供应简写
-                    gpu_mfrs = gpu_mfrs_temp
-                gpu_used += gpu_used_temp
-                gpu_total += gpu_total_temp
-
-            message += '<tr bgcolor="%s">%s %s %s %s %s %s %s<tr>' % (
-                clolr,
-                td_html % cluster_name,
-                td_html % org,
-                td_html % ip_html,
-                td_html % ('<a target="blank" href="%s">%s</a>' % (grafana_url, device)),
-                td_html % ("cpu:%s/%s" % (nodes[ip]['used_cpu'], nodes[ip]['cpu'])),
-                td_html % ("mem:%s/%s" % (nodes[ip]['used_memory'], nodes[ip]['memory'])),
-                # td_html % ("gpu:%s/%s" % (round(nodes[ip]['used_gpu'],2) if 'vgpu' in device else int(float(nodes[ip]['used_gpu'])), nodes[ip]['gpu'])),
-                td_html % (f"{gpu_mfrs}:{gpu_used}/{gpu_total}"),
-
-                # td_html % (','.join(list(set(nodes[ip]['user']))[0:1]))
-            )
-
-            global_cluster_load[cluster_name]['cpu_req'] += int(nodes[ip]['used_cpu'])
-            global_cluster_load[cluster_name]['cpu_all'] += int(nodes[ip]['cpu'])
-            global_cluster_load[cluster_name]['mem_req'] += int(nodes[ip]['used_memory'])
-            global_cluster_load[cluster_name]['mem_all'] += int(nodes[ip]['memory'])
-            global_cluster_load[cluster_name]['gpu_req'] += round(gpu_used, 2)
-            global_cluster_load[cluster_name]['gpu_all'] += int(float(gpu_total))
-
-    message = Markup('<table style="margin:20px">%s</table>' % message)
-
-    data = {
-        'content': message,
-        'delay': 300000,
-        'hit': True,
-        'target': conf.get('MODEL_URLS', {}).get('total_resource', ''),
-        'title': __('机器负载'),
-        'style': {
-            'height': '600px'
-        },
-        'type': 'html',
-    }
-    # 返回模板
-    return data
 
 
 # pipeline每个任务的资源占用情况
@@ -264,6 +113,161 @@ def pod_resource():
                     all_pod_resource.append(pod_resource)
     return all_pod_resource
 
+    # 机器学习首页资源弹窗
+@pysnooper.snoop()
+def node_traffic():
+    is_admin_user = g.user.is_admin()
+    if not node_resource_used['check_time'] or node_resource_used['check_time'] < (datetime.datetime.now() - datetime.timedelta(seconds=10)):
+
+        all_node_json = {}
+        clusters = conf.get('CLUSTERS', {})
+        for cluster_name in clusters:
+            try:
+                cluster = clusters[cluster_name]
+                k8s_client = K8s(cluster.get('KUBECONFIG', ''))
+
+                all_node = k8s_client.get_node()
+                all_node_resource = k8s_client.get_all_node_allocated_resources()
+                all_node_json[cluster_name] = {}
+                for node in all_node:
+                    all_node_json[cluster_name][node['hostip']] = node
+                    node_allocated_resources = all_node_resource.get(node['name'], {
+                        "used_cpu": 0,
+                        "used_memory": 0,
+                        "used_gpu": 0
+                    })
+                    # print(node_allocated_resources)
+                    all_node_json[cluster_name][node['hostip']].update(node_allocated_resources)
+            except Exception as e:
+                print(e)
+
+        node_resource_used['data'] = all_node_json
+        node_resource_used['check_time'] = datetime.datetime.now()
+
+    all_node_json = node_resource_used['data']
+    # print(all_node_json)
+    # 数据格式说明 dict:
+    # 'delay': Integer 延时隐藏 单位: 毫秒 0为不隐藏
+    # 'hit': Boolean 是否命中
+    # 'target': String 当前目标
+    # 'type': String 类型 目前仅支持html类型
+    # 'title': String 标题
+    # 'content': String 内容html内容
+    # /static/appbuilder/mnt/make_pipeline.mp4
+    message = ''
+    td_html = '<td style="border: 1px solid black;padding: 10px">%s</th>'
+    message += "<tr>%s %s %s %s %s %s %s<tr>" % (
+        td_html % __("集群"), td_html % __("资源组"), td_html % __("机器"), td_html % __("机型"), td_html % __("cpu占用率"), td_html % __("内存占用率"),
+        td_html % __("AI加速卡"))
+
+    global global_cluster_load
+    for cluster_name in all_node_json:
+        global_cluster_load[cluster_name] = {
+            "cpu_req": 0,
+            "cpu_all": 0,
+            "mem_req": 0,
+            "mem_all": 0,
+            "gpu_req": 0,
+            "gpu_all": 0
+        }
+        nodes = all_node_json[cluster_name]
+        # nodes = sorted(nodes.items(), key=lambda item: item[1]['labels'].get('org','public'))
+        # ips = [node[0] for node in nodes]
+        # values = [node[1] for node in nodes]
+        # nodes = dict(zip(ips,values))
+
+        # 按项目组和设备类型分组
+        stored_nodes = {}
+        for ip in nodes:
+            org = nodes[ip]['labels'].get('org', 'public')
+            device = 'cpu'
+            if nodes[ip]['labels'].get('gpu','')=='true':
+                device = 'gpu/' + nodes[ip]['labels'].get('gpu-type', '')
+            if nodes[ip]['labels'].get('vgpu', '') == 'true':
+                device = 'vgpu/' + nodes[ip]['labels'].get('gpu-type', '')
+            if org not in stored_nodes:
+                stored_nodes[org] = {}
+            if device not in stored_nodes[org]:
+                stored_nodes[org][device] = {}
+            stored_nodes[org][device][ip] = nodes[ip]
+        nodes = {}
+        for org in stored_nodes:
+            for device in stored_nodes[org]:
+                nodes.update(stored_nodes[org][device])
+
+        cluster_config = conf.get('CLUSTERS', {}).get(cluster_name, {})
+        grafana_url = "//" + cluster_config.get('HOST', request.host) + conf.get('GRAFANA_CLUSTER_PATH')
+        for ip in nodes:
+            node_dashboard_url = "//"+ cluster_config.get('HOST', request.host) + conf.get('K8S_DASHBOARD_CLUSTER') + '#/node/%s?namespace=default' % nodes[ip]['name']
+            org = nodes[ip]['labels'].get('org', 'public')
+            enable_train = nodes[ip]['labels'].get('train', 'true')
+            # ip_html = '<a target="_blank" href="%s">%s</a>' % (node_dashboard_url, ip if nodes[ip]['status']=='Ready' else f'<del>{ip}</del>')
+            ip_html = (
+                f'<a target="_blank" href="{node_dashboard_url}">{ip}</a>' if is_admin_user else ip
+            )
+            # 同样调整机型列链接显示
+
+            share = nodes[ip]['labels'].get('share', 'true')
+            clolr = "#FFFFFF" if share == 'true' else '#F0F0F0'
+            device = ''
+            if nodes[ip]['labels'].get('cpu','') == 'true':
+                device = 'cpu/'
+            if nodes[ip]['labels'].get('gpu','')=='true':
+                device = device+'gpu/'
+            if nodes[ip]['labels'].get('vgpu','')=='true':
+                device = device+'vgpu/'
+            device = device + nodes[ip]['labels'].get('gpu-type', '')
+            device=device.strip('/')
+            device_html = (f'<a target="blank" href="{grafana_url}">{device}</a>' if is_admin_user else device)
+
+            gpu_used=0
+            gpu_total=0
+            gpu_mfrs='gpu'
+            gpu_resource = conf.get('GPU_RESOURCE')
+            for gpu_mfrs_temp in gpu_resource:
+                gpu_used_temp = round(nodes[ip].get(f'used_{gpu_mfrs_temp}',0), 2)
+                gpu_total_temp = nodes[ip][gpu_mfrs_temp]
+                if gpu_total_temp>0.01:  # 存在指定卡型资源，就显示指定卡提供应简写
+                    gpu_mfrs = gpu_mfrs_temp
+                gpu_used += gpu_used_temp
+                gpu_total += gpu_total_temp
+
+            message += '<tr bgcolor="%s">%s %s %s %s %s %s %s<tr>' % (
+                clolr,
+                td_html % cluster_name,
+                td_html % org,
+                td_html % ip_html,
+                td_html % device_html,
+                td_html % ("cpu:%s/%s" % (nodes[ip]['used_cpu'], nodes[ip]['cpu'])),
+                td_html % ("mem:%s/%s" % (nodes[ip]['used_memory'], nodes[ip]['memory'])),
+                # td_html % ("gpu:%s/%s" % (round(nodes[ip]['used_gpu'],2) if 'vgpu' in device else int(float(nodes[ip]['used_gpu'])), nodes[ip]['gpu'])),
+                td_html % (f"{gpu_mfrs}:{gpu_used}/{gpu_total}"),
+
+                # td_html % (','.join(list(set(nodes[ip]['user']))[0:1]))
+            )
+
+            global_cluster_load[cluster_name]['cpu_req'] += int(nodes[ip]['used_cpu'])
+            global_cluster_load[cluster_name]['cpu_all'] += int(nodes[ip]['cpu'])
+            global_cluster_load[cluster_name]['mem_req'] += int(nodes[ip]['used_memory'])
+            global_cluster_load[cluster_name]['mem_all'] += int(nodes[ip]['memory'])
+            global_cluster_load[cluster_name]['gpu_req'] += round(gpu_used, 2)
+            global_cluster_load[cluster_name]['gpu_all'] += int(float(gpu_total))
+
+    message = Markup('<table style="margin:20px">%s</table>' % message)
+
+    data = {
+        'content': message,
+        'delay': 300000,
+        'hit': True,
+        'target': conf.get('MODEL_URLS', {}).get('total_resource', ''),
+        'title': __('机器负载'),
+        'style': {
+            'height': '600px'
+        },
+        'type': 'html',
+    }
+    # 返回模板
+    return data
 
 # 添加api
 class Total_Resource_ModelView_Api(MyappFormRestApi):
@@ -329,13 +333,14 @@ class Total_Resource_ModelView_Api(MyappFormRestApi):
         total_count=len(lst)
         return total_count,lst
 
-    # @pysnooper.snoop()
+    #@pysnooper.snoop()
     def echart_option(self, filters=None):
         global global_cluster_load
 
         if not global_cluster_load:
             node_resource_used['check_time'] = None
-            node_traffic()
+            if g.user.is_admin():
+                node_traffic()
 
         from myapp.utils.py.py_prometheus import Prometheus
         prometheus = Prometheus(conf.get('PROMETHEUS', 'prometheus-k8s.monitoring:9090'))

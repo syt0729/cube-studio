@@ -1064,8 +1064,7 @@ export default function TaskListManager(props?: IAppMenuItem) {
             <TitleHeader title={<>
                 {
                     (props?.isSubRoute || getParam('targetId')) ? <Button className="mr16" onClick={() => {
-                        navigate('/data/metadata/metadata_dimension')
-                        window.location.reload()
+                        navigate(-1)
                     }}><RollbackOutlined />{t('返回')}</Button> : null
                 }
                 <span>{labelTitle}</span>

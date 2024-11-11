@@ -79,7 +79,6 @@ const cardTitleStyles = mergeStyles({
   marginTop: 16,
   textAlign: 'center',
   cursor: 'pointer',
-  whiteSpace: 'nowrap',
   display: 'flex',
   flexFlow: 'column nowrap',
   width: 'auto',
