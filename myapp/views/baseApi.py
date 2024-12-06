@@ -613,6 +613,9 @@ class MyappModelRestApi(ModelRestApi):
                 # 处理时间类型
                 if hasattr(column_field_kwargs['widget'], 'is_date_range') and column_field_kwargs['widget'].is_date_range:
                     col_info['ui-type'] = 'rangePicker'
+                # 处理json类型
+                if hasattr(column_field_kwargs['widget'], 'is_json') and column_field_kwargs['widget'].is_json:
+                    col_info['ui-type'] = 'json'
 
             col_info = self.make_ui_info(col_info)
             ret.append(col_info)
@@ -1923,7 +1926,7 @@ class MyappModelRestApi(ModelRestApi):
             ret['ui-type'] = 'select2'
 
         # 字符串
-        if ret.get('ui-type', '') not in ['list', 'datePicker']:  # list,datePicker 类型，保持原样
+        if ret.get('ui-type', '') not in ['list', 'datePicker','json']:  # list,datePicker 类型，保持原样
             if ret.get('type', '') in ['String', ]:
                 if ret.get('widget', 'BS3Text') == 'BS3Text':
                     ret['ui-type'] = 'input'
@@ -1994,6 +1997,10 @@ class MyappModelRestApi(ModelRestApi):
             # 处理时间类型
             if hasattr(column_field_kwargs['widget'], 'is_date_range') and column_field_kwargs['widget'].is_date_range:
                 ret['ui-type'] = 'rangePicker'
+
+            # 处理json类型
+            if hasattr(column_field_kwargs['widget'], 'is_json') and column_field_kwargs['widget'].is_json:
+                ret['ui-type'] = 'json'
 
             # 处理扩展字段，一个字段存储一个list的值
             if hasattr(column_field_kwargs['widget'], 'expand_filed') and column_field_kwargs['widget'].expand_filed:

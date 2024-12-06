@@ -213,7 +213,8 @@ const translation = {
   "项目设置": "项目设置",
   "智能推荐下游节点":"智能推荐下游节点",
   "请先选择推荐节点":"请先选择推荐节点",
-  "导出数据": "导出数据"
+  "导出数据": "导出数据",
+  "json格式错误":"Invalid JSON format. Please correct it."
 }
 
 export default translation
